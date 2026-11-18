@@ -58,7 +58,7 @@ export function Pill({
     <Pressable
       testID={testID}
       accessibilityRole="button"
-      accessibilityState={{ selected: !!active }}
+      aria-selected={!!active}
       onPress={onPress}
       style={({ pressed }) => [
         styles.pill,
@@ -89,7 +89,7 @@ export function Segmented<T extends string>({
           <Pressable
             key={o.value}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            aria-selected={active}
             onPress={() => onChange(o.value)}
             style={[styles.segmentItem, active && styles.segmentActive]}
           >

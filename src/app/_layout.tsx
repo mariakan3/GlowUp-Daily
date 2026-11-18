@@ -43,7 +43,7 @@ export default function RootLayout() {
               tabBarActiveTintColor: colors.espresso,
               tabBarInactiveTintColor: colors.muted,
               tabBarStyle: { backgroundColor: colors.card, borderTopColor: colors.line, height: 64, paddingTop: 6, paddingBottom: 8 },
-              tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+              tabBarLabelStyle: { fontSize: 10, fontWeight: '700' },
               sceneStyle: { backgroundColor: colors.oat },
             }}
           >

@@ -84,7 +84,7 @@ export function RoutinesScreen() {
                   <Pressable
                     key={d}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on }}
+                    aria-checked={on}
                     accessibilityLabel={`${t.title} on ${weekdayShort[d]}`}
                     onPress={() => {
                       winFeedback('tap');

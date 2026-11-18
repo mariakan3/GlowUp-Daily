@@ -65,7 +65,7 @@ export function GlowProgressRing({
   return (
     <Animated.View style={{ width: size, height: size, transform: [{ scale: pulse }] }}>
       {glow ? <View style={[StyleSheet.absoluteFill, { borderRadius: size / 2, backgroundColor: glow, transform: [{ scale: 1.08 }], opacity: 0.9 }]} /> : null}
-      <Svg width={size} height={size}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
         <Defs>
           <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor={color} />

@@ -47,7 +47,7 @@ export const TaskCard = memo(function TaskCard({ title, emoji, category, done, o
       <Pressable
         testID={testID}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: done }}
+        aria-checked={done}
         accessibilityLabel={title}
         onPress={handlePress}
         onLongPress={onLongPress}

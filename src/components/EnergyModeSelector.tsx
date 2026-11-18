@@ -28,7 +28,7 @@ export function EnergyModeSelector({ mode }: { mode: EnergyMode }) {
               key={m}
               testID={`energy-${m}`}
               accessibilityRole="radio"
-              accessibilityState={{ selected }}
+              aria-selected={selected}
               accessibilityLabel={`${meta.label}, ${meta.target} wins`}
               onPress={() => choose(m)}
               style={({ pressed }) => [

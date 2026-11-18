@@ -137,7 +137,7 @@ export function AddTaskModal({ visible, onClose, task }: { visible: boolean; onC
               key={d}
               onPress={() => toggleDay(d)}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
+              aria-checked={on}
               style={[styles.day, on && { backgroundColor: colors.matcha, borderColor: colors.matcha }]}
             >
               <Text style={[styles.dayText, on && { color: colors.espresso }]}>{weekdayShort[d]}</Text>

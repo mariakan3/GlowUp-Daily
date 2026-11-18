@@ -42,7 +42,7 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
       <Pressable
         testID={`step-${step.id}`}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: done, disabled: locked }}
+        aria-checked={done}
         accessibilityLabel={`Step ${index}: ${step.title}`}
         onPress={onPress}
         style={[styles.step, done && { backgroundColor: tint }, isNext && { borderColor: color, borderWidth: 2 }]}

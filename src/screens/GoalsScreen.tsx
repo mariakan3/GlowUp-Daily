@@ -37,7 +37,7 @@ function MilestoneRow({ goal, ms, index, color, tint }: { goal: Goal; ms: Milest
       <Pressable
         testID={`milestone-${ms.id}`}
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: done }}
+        aria-checked={done}
         accessibilityLabel={ms.title}
         onPress={onPress}
         style={[styles.ms, done && { backgroundColor: tint }]}

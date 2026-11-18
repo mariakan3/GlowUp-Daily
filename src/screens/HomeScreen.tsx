@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { ChevronDown, ChevronUp, Flame, Plus, Timer } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Plus, Timer } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddTaskModal } from '../components/AddTaskModal';
@@ -57,7 +57,6 @@ export function HomeScreen() {
             </Text>
           </View>
           <View style={styles.streak} accessibilityLabel={`${streak} day streak`}>
-            <Flame size={16} color={colors.peach} fill={colors.peach} />
             <Text style={styles.streakText}>🔥 {streak} Day Streak</Text>
           </View>
         </View>
@@ -147,7 +146,7 @@ export function HomeScreen() {
                 style={styles.groupHeader}
                 onPress={() => setCollapsed((c) => ({ ...c, [tod]: !c[tod] }))}
                 accessibilityRole="button"
-                accessibilityState={{ expanded: !isCollapsed }}
+                aria-expanded={!isCollapsed}
               >
                 <Text style={styles.groupEmoji}>{meta.emoji}</Text>
                 <View style={{ flex: 1 }}>
