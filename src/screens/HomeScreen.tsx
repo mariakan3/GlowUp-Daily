@@ -63,7 +63,7 @@ export function HomeScreen() {
 
         <Card style={styles.ringCard}>
           <GlowProgressRing progress={wins / target} color={aura.color} secondaryColor={wins >= target ? colors.matcha : aura.color} glow={aura.glow} pulseKey={wins} size={210}>
-            <Text style={styles.ringLabel}>Today's Wins</Text>
+            <Text style={styles.ringLabel}>Today’s Wins</Text>
             <Text style={styles.ringCount} testID="win-count">
               {wins}
               <Text style={styles.ringTarget}> / {target}</Text>

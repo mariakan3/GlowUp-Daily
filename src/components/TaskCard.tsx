@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react-native';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { isWeb, useNativeDriver, winFeedback } from '../lib/feedback';
 import { categoryMeta, colors, radius, shadow } from '../theme';
@@ -21,8 +21,8 @@ interface Props {
 /** One-tap micro-win row: haptic (or web bounce), check pop, strike-through and +1 chip. */
 export const TaskCard = memo(function TaskCard({ title, emoji, category, done, onToggle, meta, winLabel = '+1', dimmed, onLongPress, testID }: Props) {
   const cat = categoryMeta[category];
-  const scale = useRef(new Animated.Value(1)).current;
-  const check = useRef(new Animated.Value(done ? 1 : 0)).current;
+  const scale = useState(() => new Animated.Value(1))[0];
+  const check = useState(() => new Animated.Value(done ? 1 : 0))[0];
 
   useEffect(() => {
     Animated.spring(check, { toValue: done ? 1 : 0, useNativeDriver, speed: 20, bounciness: 14 }).start();

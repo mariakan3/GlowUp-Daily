@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNativeDriver } from '../lib/feedback';
@@ -15,7 +15,7 @@ const kindStyle: Record<Toast['kind'], { bg: string; fg: string }> = {
 
 function ToastBubble({ toast, index }: { toast: Toast; index: number }) {
   const dismiss = useGlowStore((s) => s.dismissToast);
-  const progress = useRef(new Animated.Value(0)).current;
+  const progress = useState(() => new Animated.Value(0))[0];
   const isSuper = toast.kind === 'super';
 
   useEffect(() => {

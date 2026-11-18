@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ALL_DAYS, weekdayShort } from '../lib/date';
 import { winFeedback } from '../lib/feedback';
@@ -17,28 +17,25 @@ const tierOptions: { value: TaskTier; label: string; hint: string }[] = [
   { value: 3, label: '🚀 High Era', hint: 'Only on full-schedule days' },
 ];
 
-export function AddTaskModal({ visible, onClose, task }: { visible: boolean; onClose: () => void; task?: Task | null }) {
+type Props = { visible: boolean; onClose: () => void; task?: Task | null };
+
+export function AddTaskModal(props: Props) {
+  if (!props.visible) return null;
+  return <AddTaskForm key={props.task?.id ?? 'new'} {...props} />;
+}
+
+function AddTaskForm({ visible, onClose, task }: Props) {
   const addTask = useGlowStore((s) => s.addTask);
   const updateTask = useGlowStore((s) => s.updateTask);
   const deleteTask = useGlowStore((s) => s.deleteTask);
   const pushToast = useGlowStore((s) => s.pushToast);
 
-  const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState('✨');
-  const [category, setCategory] = useState<CategoryId>('selfcare');
-  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>('evening');
-  const [tier, setTier] = useState<TaskTier>(2);
-  const [days, setDays] = useState<Weekday[]>(ALL_DAYS);
-
-  useEffect(() => {
-    if (!visible) return;
-    setTitle(task?.title ?? '');
-    setEmoji(task?.emoji ?? '✨');
-    setCategory(task?.category ?? 'selfcare');
-    setTimeOfDay(task?.timeOfDay ?? 'evening');
-    setTier(task?.tier ?? 2);
-    setDays(task?.days ?? ALL_DAYS);
-  }, [visible, task]);
+  const [title, setTitle] = useState(task?.title ?? '');
+  const [emoji, setEmoji] = useState(task?.emoji ?? '✨');
+  const [category, setCategory] = useState<CategoryId>(task?.category ?? 'selfcare');
+  const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(task?.timeOfDay ?? 'evening');
+  const [tier, setTier] = useState<TaskTier>(task?.tier ?? 2);
+  const [days, setDays] = useState<Weekday[]>(task?.days ?? ALL_DAYS);
 
   const toggleDay = (d: Weekday) => setDays((prev) => (prev.includes(d) ? (prev.length > 1 ? prev.filter((x) => x !== d) : prev) : [...prev, d].sort()));
 
@@ -77,7 +74,7 @@ export function AddTaskModal({ visible, onClose, task }: { visible: boolean; onC
         </View>
       }
     >
-      <Text style={ui.label}>What's the win?</Text>
+      <Text style={ui.label}>What’s the win?</Text>
       <TextInput
         testID="task-title-input"
         value={title}

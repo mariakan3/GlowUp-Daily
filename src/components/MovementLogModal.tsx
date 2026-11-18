@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { winFeedback } from '../lib/feedback';
 import { useGlowStore } from '../store/useGlowStore';
@@ -23,18 +23,19 @@ const notePlaceholder: Record<SportId, string> = {
   walk: 'Sunset walk with a podcast',
 };
 
-export function MovementLogModal({ sport, onClose }: { sport: SportId | null; onClose: () => void }) {
-  const logMovement = useGlowStore((s) => s.logMovement);
-  const [minutes, setMinutes] = useState(45);
-  const [vibe, setVibe] = useState<MovementVibe>('🔥');
-  const [note, setNote] = useState('');
+const defaultMinutes: Record<SportId, number> = { pilates: 45, tennis: 60, running: 30, gym: 45, walk: 45 };
+const defaultVibe: Record<SportId, MovementVibe> = { pilates: '🧘‍♀️', tennis: '🎾', running: '⚡', gym: '🔥', walk: '🔥' };
 
-  useEffect(() => {
-    if (!sport) return;
-    setMinutes(sport === 'tennis' ? 60 : sport === 'running' ? 30 : 45);
-    setVibe(sport === 'tennis' ? '🎾' : sport === 'pilates' ? '🧘‍♀️' : sport === 'running' ? '⚡' : '🔥');
-    setNote('');
-  }, [sport]);
+export function MovementLogModal({ sport, onClose }: { sport: SportId | null; onClose: () => void }) {
+  if (!sport) return null;
+  return <MovementLogForm key={sport} sport={sport} onClose={onClose} />;
+}
+
+function MovementLogForm({ sport, onClose }: { sport: SportId; onClose: () => void }) {
+  const logMovement = useGlowStore((s) => s.logMovement);
+  const [minutes, setMinutes] = useState(defaultMinutes[sport]);
+  const [vibe, setVibe] = useState<MovementVibe>(defaultVibe[sport]);
+  const [note, setNote] = useState('');
 
   const meta = sport ? sportMeta[sport] : null;
 

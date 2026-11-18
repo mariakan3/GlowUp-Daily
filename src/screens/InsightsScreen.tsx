@@ -149,7 +149,7 @@ export function InsightsScreen() {
             );
           })}
         </View>
-        <Text style={[ui.muted, { marginTop: 8, fontSize: 11 }]}>Dashed line = that day's Energy Mode target. Green = target hit.</Text>
+        <Text style={[ui.muted, { marginTop: 8, fontSize: 11 }]}>Dashed line = that day’s Energy Mode target. Green = target hit.</Text>
       </Card>
 
       <SectionTitle title="Habit matrix" subtitle="Your most consistent micro-wins" />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useNativeDriver } from '../lib/feedback';
@@ -33,9 +33,9 @@ export function GlowProgressRing({
   children,
 }: Props) {
   const clamped = Math.max(0, Math.min(1, progress));
-  const anim = useRef(new Animated.Value(clamped)).current;
+  const anim = useState(() => new Animated.Value(clamped))[0];
   const [shown, setShown] = useState(clamped);
-  const pulse = useRef(new Animated.Value(1)).current;
+  const pulse = useState(() => new Animated.Value(1))[0];
   const lastPulse = useRef(pulseKey);
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export function GlowProgressRing({
 
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const gradId = useRef(`ring-${Math.random().toString(36).slice(2, 8)}`).current;
+  const gradId = `ring-${useId().replace(/:/g, '')}`;
 
   return (
     <Animated.View style={{ width: size, height: size, transform: [{ scale: pulse }] }}>

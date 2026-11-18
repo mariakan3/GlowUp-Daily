@@ -1,5 +1,5 @@
 import { Check, Pencil, Plus } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AddGoalModal } from '../components/AddGoalModal';
 import { IconButton, ProgressBar, SectionTitle } from '../components/ui';
@@ -10,8 +10,8 @@ import type { Goal, Milestone } from '../types';
 
 function MilestoneRow({ goal, ms, index, color, tint }: { goal: Goal; ms: Milestone; index: number; color: string; tint: string }) {
   const toggleMilestone = useGlowStore((s) => s.toggleMilestone);
-  const burst = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
+  const burst = useState(() => new Animated.Value(0))[0];
+  const scale = useState(() => new Animated.Value(1))[0];
   const done = !!ms.doneAt;
 
   const onPress = () => {

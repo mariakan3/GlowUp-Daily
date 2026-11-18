@@ -1,5 +1,5 @@
 import { Check, Lock, Plus, Trash2 } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useToday } from '../lib/hooks';
 import { isWeb, useNativeDriver, winFeedback } from '../lib/feedback';
@@ -18,8 +18,8 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
   const toggle = useGlowStore((s) => s.toggleRoutineStep);
   const remove = useGlowStore((s) => s.removeRoutineStep);
   const pushToast = useGlowStore((s) => s.pushToast);
-  const scale = useRef(new Animated.Value(1)).current;
-  const shake = useRef(new Animated.Value(0)).current;
+  const scale = useState(() => new Animated.Value(1))[0];
+  const shake = useState(() => new Animated.Value(0))[0];
 
   const onPress = () => {
     const result = toggle(step.id);

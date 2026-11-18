@@ -1,5 +1,5 @@
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useGlowStore } from '../store/useGlowStore';
 import { categoryMeta, categoryOrder, colors } from '../theme';
@@ -11,24 +11,25 @@ const goalEmojis = ['🎯', '🎓', '🏃‍♀️', '🎾', '🍳', '🫧', '�
 const MIN_STEPS = 3;
 const MAX_STEPS = 5;
 
-export function AddGoalModal({ visible, onClose, goal }: { visible: boolean; onClose: () => void; goal?: Goal | null }) {
+type Props = { visible: boolean; onClose: () => void; goal?: Goal | null };
+
+export function AddGoalModal(props: Props) {
+  if (!props.visible) return null;
+  return <AddGoalForm key={props.goal?.id ?? 'new'} {...props} />;
+}
+
+function AddGoalForm({ visible, onClose, goal }: Props) {
   const addGoal = useGlowStore((s) => s.addGoal);
   const updateGoal = useGlowStore((s) => s.updateGoal);
   const deleteGoal = useGlowStore((s) => s.deleteGoal);
   const pushToast = useGlowStore((s) => s.pushToast);
-  const [title, setTitle] = useState('');
-  const [emoji, setEmoji] = useState('🎯');
-  const [category, setCategory] = useState<CategoryId>('studies');
-  const [steps, setSteps] = useState<string[]>(['', '', '']);
-
-  useEffect(() => {
-    if (!visible) return;
-    setTitle(goal?.title ?? '');
-    setEmoji(goal?.emoji ?? '🎯');
-    setCategory(goal?.category ?? 'studies');
+  const [title, setTitle] = useState(goal?.title ?? '');
+  const [emoji, setEmoji] = useState(goal?.emoji ?? '🎯');
+  const [category, setCategory] = useState<CategoryId>(goal?.category ?? 'studies');
+  const [steps, setSteps] = useState<string[]>(() => {
     const existing = goal?.milestones.map((m) => m.title) ?? [];
-    setSteps([...existing, ...Array(Math.max(0, MIN_STEPS - existing.length)).fill('')]);
-  }, [visible, goal]);
+    return [...existing, ...Array<string>(Math.max(0, MIN_STEPS - existing.length)).fill('')];
+  });
 
   const filled = steps.filter((s) => s.trim()).length;
   const canSave = title.trim().length > 0 && filled >= MIN_STEPS;

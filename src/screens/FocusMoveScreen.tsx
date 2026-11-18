@@ -1,5 +1,5 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { H1, Screen, Segmented, ui } from '../components/ui';
 import { MovementScreen } from './MovementScreen';
@@ -9,10 +9,11 @@ type Panel = 'focus' | 'move';
 
 export function FocusMoveScreen() {
   const params = useLocalSearchParams<{ panel?: string }>();
-  const [panel, setPanel] = useState<Panel>(params.panel === 'move' ? 'move' : 'focus');
-  useEffect(() => {
-    if (params.panel === 'move' || params.panel === 'focus') setPanel(params.panel);
-  }, [params.panel]);
+  const isPanel = (v?: string): v is Panel => v === 'move' || v === 'focus';
+  const [state, setState] = useState<{ param?: string; panel: Panel }>({ param: params.panel, panel: isPanel(params.panel) ? params.panel : 'focus' });
+  if (state.param !== params.panel) setState({ param: params.panel, panel: isPanel(params.panel) ? params.panel : state.panel });
+  const panel = state.panel;
+  const setPanel = (p: Panel) => setState((s) => ({ ...s, panel: p }));
 
   return (
     <Screen>
