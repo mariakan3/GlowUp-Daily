@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { Button, Card, H1, Screen, SectionTitle, ui } from '../components/ui';
+import { AccountCard } from '../components/AccountCard';
+import { Card, H1, Screen, SectionTitle, ui } from '../components/ui';
 import { addDays, formatDuration, lastSevenDays, weekdayLabel, weekdayOf } from '../lib/date';
 import { useToday } from '../lib/hooks';
 import { bestStreak, categoryTotals, computeStreak, modeOn, targetOn, winsByDate } from '../lib/wins';
@@ -52,8 +53,6 @@ export function InsightsScreen() {
   const focusSessions = useGlowStore((s) => s.focusSessions);
   const movementSessions = useGlowStore((s) => s.movementSessions);
   const goals = useGlowStore((s) => s.goals);
-  const resetDemoData = useGlowStore((s) => s.resetDemoData);
-  const [confirmReset, setConfirmReset] = useState(false);
 
   const week = useMemo(() => lastSevenDays(today), [today]);
   const prevWeek = useMemo(() => lastSevenDays(addDays(today, -7)), [today]);
@@ -112,7 +111,11 @@ export function InsightsScreen() {
         </Text>
         <Text style={styles.scoreLabel}>Wins this week!</Text>
         <Text style={styles.scoreDelta}>
-          {delta >= 0 ? `▲ ${delta} more than the 7 days before` : `▼ ${-delta} fewer than the 7 days before. Rest counts too 💛`}
+          {weekTotal === 0 && prevTotal === 0
+            ? 'Every win you tick lands here. Your trophy shelf is waiting 🏆'
+            : delta >= 0
+              ? `▲ ${delta} more than the 7 days before`
+              : `▼ ${-delta} fewer than the 7 days before. Rest counts too 💛`}
         </Text>
         <View style={styles.scoreRow}>
           <View style={styles.scoreStat}>
@@ -130,7 +133,7 @@ export function InsightsScreen() {
         </View>
       </Card>
 
-      <SectionTitle title="Daily wins" subtitle={`Best day: ${weekdayLabel[weekdayOf(bestDay)]} with ${byDate[bestDay] ?? 0} wins`} />
+      <SectionTitle title="Daily wins" subtitle={weekTotal ? `Best day: ${weekdayLabel[weekdayOf(bestDay)]} with ${byDate[bestDay] ?? 0} wins` : 'Your daily wins will grow here'} />
       <Card>
         <View style={styles.bars}>
           {week.map((d) => {
@@ -235,24 +238,7 @@ export function InsightsScreen() {
         ))}
       </View>
 
-      <View style={{ marginTop: 28 }}>
-        {confirmReset ? (
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Button label="Cancel" variant="soft" onPress={() => setConfirmReset(false)} style={{ flex: 1 }} />
-            <Button
-              label="Yes, reset"
-              variant="danger"
-              onPress={() => {
-                resetDemoData();
-                setConfirmReset(false);
-              }}
-              style={{ flex: 1 }}
-            />
-          </View>
-        ) : (
-          <Button label="Reset to demo data" variant="ghost" onPress={() => setConfirmReset(true)} />
-        )}
-      </View>
+      <AccountCard />
     </Screen>
   );
 }

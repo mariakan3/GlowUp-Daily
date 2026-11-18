@@ -4,7 +4,9 @@ import { winFeedback } from '../lib/feedback';
 import { useGlowStore } from '../store/useGlowStore';
 import { colors, radius, sportMeta } from '../theme';
 import type { MovementVibe, SportId } from '../types';
+import { filterSuggestions, movementNoteSuggestions } from '../data/suggestions';
 import { Sheet } from './Sheet';
+import { SuggestionChips } from './SuggestionChips';
 import { Button, ui } from './ui';
 
 const durations = [15, 30, 45, 60, 90];
@@ -93,6 +95,13 @@ function MovementLogForm({ sport, onClose }: { sport: SportId; onClose: () => vo
         placeholderTextColor={colors.muted}
         style={ui.input}
         maxLength={120}
+      />
+      <SuggestionChips
+        testID="note-suggestions"
+        title="Note ideas"
+        horizontal
+        items={filterSuggestions(movementNoteSuggestions[sport], note, [note], (x) => x, 6).map((x) => ({ key: x, label: x }))}
+        onPick={setNote}
       />
     </Sheet>
   );

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { buildSeedHistory, focusPresets, seedGoals, seedRoutineSteps, seedSubjects, seedTasks } from '../data/seed';
+import { DEFAULT_FOCUS_SUBJECT, focusPresets } from '../data/presets';
 import { todayKey, weekdayOf } from '../lib/date';
 import { uid } from '../lib/id';
 import { activeTasksFor, doneTaskIds, shelfWinsFor } from '../lib/plan';
@@ -39,13 +39,13 @@ export { uid };
 const idleTimer: TimerState = {
   phase: 'idle',
   presetId: 'pomodoro',
-  subject: seedSubjects[0],
+  subject: '',
   endsAt: null,
   pausedRemaining: null,
   phaseDurationSec: 25 * 60,
 };
 
-interface PersistedState {
+export interface PersistedState {
   tasks: Task[];
   routineSteps: RoutineStep[];
   events: WinEvent[];
@@ -60,9 +60,10 @@ interface PersistedState {
   previousTasksSnapshot: TasksSnapshot | null;
   aiScheduleProfile: AIScheduleProfile | null;
   aiSettings: AISettings;
+  onboarded: boolean;
 }
 
-interface GlowState extends PersistedState {
+export interface GlowState extends PersistedState {
   hydrated: boolean;
   toasts: Toast[];
 
@@ -105,31 +106,46 @@ interface GlowState extends PersistedState {
   completeQuickWin: (candidate: QuickWinCandidate, beatTimer: boolean) => void;
   setAISettings: (patch: Partial<AISettings>) => void;
 
-  resetDemoData: () => void;
+  setUserName: (name: string) => void;
+  completeOnboarding: (input: { name: string; tasks: TaskInput[]; steps: { routine: RoutineId; title: string; emoji: string }[] }) => void;
+  /** Replaces all user data, e.g. after pulling from the server or signing out. */
+  replaceUserData: (data: PersistedState) => void;
 }
 
-function createSeedState(): PersistedState {
-  const now = Date.now();
-  const today = todayKey();
-  const goals = seedGoals(now);
-  const history = buildSeedHistory(today, now, goals);
+export function createEmptyState(): PersistedState {
   return {
-    tasks: seedTasks,
-    routineSteps: seedRoutineSteps,
-    events: history.events,
-    dayModes: history.dayModes,
-    subjects: seedSubjects,
-    focusSessions: history.focusSessions,
+    tasks: [],
+    routineSteps: [],
+    events: [],
+    dayModes: {},
+    subjects: [],
+    focusSessions: [],
     timer: idleTimer,
-    movementSessions: history.movementSessions,
-    goals,
-    userName: 'Maria',
+    movementSessions: [],
+    goals: [],
+    userName: '',
     dayPlan: null,
     previousTasksSnapshot: null,
     aiScheduleProfile: null,
     aiSettings: { provider: 'off', model: DEFAULT_MODELS.openai, hasKey: false },
+    onboarded: false,
   };
 }
+
+/**
+ * Per-user device cache. Writes are dropped while nobody is signed in, so clearing the store on sign-out
+ * never overwrites a user's cache, and one account's data is never written under another's key.
+ */
+let cacheWritesEnabled = false;
+export function setCacheWritesEnabled(on: boolean) {
+  cacheWritesEnabled = on;
+}
+const userCacheStorage = {
+  getItem: (name: string) => AsyncStorage.getItem(name),
+  setItem: (name: string, value: string) => (cacheWritesEnabled ? AsyncStorage.setItem(name, value) : Promise.resolve()),
+  removeItem: (name: string) => AsyncStorage.removeItem(name),
+};
+export const userCacheKey = (userId: string) => `glowup-daily:user:${userId}`;
 
 const todayPlanOf = (s: Pick<PersistedState, 'tasks' | 'dayPlan'>, date: string) => activeTasksFor(s.tasks, s.dayPlan, date);
 const winText = (n: number) => `+${n} Win${n === 1 ? '' : 's'} ✨`;
@@ -141,7 +157,7 @@ export function presetById(id: string) {
 export const useGlowStore = create<GlowState>()(
   persist(
     (set, get) => ({
-      ...createSeedState(),
+      ...createEmptyState(),
       hydrated: false,
       toasts: [],
 
@@ -282,15 +298,16 @@ export const useGlowStore = create<GlowState>()(
         if (timer.phase === 'focus') {
           const date = todayKey();
           const now = Date.now();
-          const session: FocusSession = { id: uid('fs'), date, ts: now, subject: timer.subject, minutes: Math.round(timer.phaseDurationSec / 60), presetId: preset.id };
-          const ev: WinEvent = { id: uid('w'), date, ts: now, source: 'focus', refId: session.id, amount: 2, category: 'studies', label: `${preset.name}: ${timer.subject}` };
+          const subject = timer.subject || DEFAULT_FOCUS_SUBJECT;
+          const session: FocusSession = { id: uid('fs'), date, ts: now, subject, minutes: Math.round(timer.phaseDurationSec / 60), presetId: preset.id };
+          const ev: WinEvent = { id: uid('w'), date, ts: now, source: 'focus', refId: session.id, amount: 2, category: 'studies', label: `${preset.name}: ${subject}` };
           const breakSec = preset.breakMin * 60;
           set((s) => ({
             focusSessions: [...s.focusSessions, session],
             events: [...s.events, ev],
             timer: { ...s.timer, phase: 'break', phaseDurationSec: breakSec, endsAt: now + breakSec * 1000, pausedRemaining: null },
           }));
-          get().pushToast(`+2 Wins 📚 ${session.minutes}m of ${timer.subject}`, 'focus');
+          get().pushToast(`+2 Wins 📚 ${session.minutes}m of ${subject}`, 'focus');
         } else if (timer.phase === 'break') {
           get().resetTimer();
           get().pushToast('Break done. Ready for another sprint? 🌿', 'info');
@@ -380,7 +397,7 @@ export const useGlowStore = create<GlowState>()(
         const ctx = {
           tasks: active,
           doneIds: doneTaskIds(state.events, date),
-          subject: state.timer.subject,
+          subject: state.timer.subject || DEFAULT_FOCUS_SUBJECT,
           shelfWins: (mode: EnergyMode) => shelfWinsFor(state.routineSteps, mode),
         };
         const apiKey = state.aiSettings.provider === 'off' ? null : await getApiKey();
@@ -458,19 +475,31 @@ export const useGlowStore = create<GlowState>()(
 
       setAISettings: (patch) => set((s) => ({ aiSettings: { ...s.aiSettings, ...patch } })),
 
-      resetDemoData: () => set((s) => ({ ...createSeedState(), aiSettings: s.aiSettings, toasts: [] })),
+      setUserName: (name) => set({ userName: name.trim() }),
+
+      completeOnboarding: ({ name, tasks, steps }) =>
+        set((s) => {
+          const baseOrder = Math.max(-1, ...s.tasks.map((t) => t.order)) + 1;
+          const newTasks: Task[] = tasks.map((t, i) => ({ ...t, id: uid('t'), order: baseOrder + i, custom: true }));
+          const newSteps: RoutineStep[] = steps.map((st, i) => ({
+            ...st,
+            id: uid('r'),
+            order: Math.max(-1, ...s.routineSteps.filter((r) => r.routine === st.routine).map((r) => r.order)) + 1 + i,
+          }));
+          return { userName: name.trim(), onboarded: true, tasks: [...s.tasks, ...newTasks], routineSteps: [...s.routineSteps, ...newSteps] };
+        }),
+
+      replaceUserData: (data) => set({ ...data, toasts: [] }),
     }),
     {
-      name: 'glowup-daily-v1',
-      version: 1,
-      storage: createJSONStorage(() => AsyncStorage),
+      name: 'glowup-daily:signed-out',
+      version: 2,
+      skipHydration: true,
+      storage: createJSONStorage(() => userCacheStorage),
       partialize: ({ hydrated, toasts, ...rest }) => {
         const persisted: Partial<GlowState> = {};
         for (const [k, v] of Object.entries(rest)) if (typeof v !== 'function') (persisted as Record<string, unknown>)[k] = v;
         return persisted as PersistedState;
-      },
-      onRehydrateStorage: () => () => {
-        useGlowStore.setState({ hydrated: true });
       },
     },
   ),

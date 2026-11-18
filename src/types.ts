@@ -129,6 +129,8 @@ export interface TaskInput {
   timeOfDay: TimeOfDay;
   tier: TaskTier;
   days: Weekday[];
+  sport?: SportId;
+  minutes?: number;
 }
 
 export interface GoalInput {

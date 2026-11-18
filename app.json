@@ -34,6 +34,10 @@
     },
     "splash": {
       "backgroundColor": "#FAF7F2"
+    },
+    "extra": {
+      "supabaseUrl": "https://dalchnficpgbaswivwyg.supabase.co",
+      "supabasePublishableKey": "sb_publishable_qCjh75PI_Pq39Pt0yv5fAA_RCXb5MIo"
     }
   }
 }

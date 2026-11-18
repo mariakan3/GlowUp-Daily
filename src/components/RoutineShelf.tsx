@@ -1,12 +1,14 @@
 import { Check, Lock, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { filterSuggestions, shelfSuggestions } from '../data/suggestions';
 import { useToday } from '../lib/hooks';
 import { isWeb, useNativeDriver, winFeedback } from '../lib/feedback';
 import { isDone } from '../lib/wins';
 import { useGlowStore } from '../store/useGlowStore';
 import { colors, radius, shadow } from '../theme';
 import type { RoutineId, RoutineStep } from '../types';
+import { SuggestionChips } from './SuggestionChips';
 import { IconButton, ProgressBar } from './ui';
 
 const shelfMeta: Record<RoutineId, { title: string; emoji: string; color: string; tint: string }> = {
@@ -86,6 +88,14 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
     addRoutineStep(routine, draft.trim(), '✨');
     setDraft('');
   };
+  const canAdd = editing || steps.length === 0;
+  const ideas = filterSuggestions(shelfSuggestions[routine], draft, steps.map((st) => st.title), (sg) => sg.title);
+  const addIdea = (title: string) => {
+    const sg = shelfSuggestions[routine].find((x) => x.title === title);
+    if (!sg) return;
+    addRoutineStep(routine, sg.title, sg.emoji);
+    setDraft('');
+  };
 
   return (
     <View style={styles.shelf}>
@@ -94,11 +104,15 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{meta.title}</Text>
           <Text style={styles.sub}>
-            {doneCount === steps.length && steps.length ? 'Shelf complete, glowing ✨' : `${doneCount}/${steps.length} steps · tap in order`}
+            {steps.length === 0
+              ? 'Empty shelf. Add your steps in order'
+              : doneCount === steps.length
+                ? 'Shelf complete, glowing ✨'
+                : `${doneCount}/${steps.length} steps · tap in order`}
           </Text>
         </View>
-        {editable ? (
-          <Pressable onPress={() => setEditing((e) => !e)} hitSlop={8}>
+        {editable && steps.length > 0 ? (
+          <Pressable testID={`shelf-${routine}-edit`} onPress={() => setEditing((e) => !e)} hitSlop={8}>
             <Text style={styles.edit}>{editing ? 'Done' : 'Edit'}</Text>
           </Pressable>
         ) : null}
@@ -119,13 +133,30 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
           tint={meta.tint}
         />
       ))}
-      {editing ? (
-        <View style={styles.addRow}>
-          <TextInput value={draft} onChangeText={setDraft} placeholder="Add a step, e.g. Eye cream" placeholderTextColor={colors.muted} style={styles.addInput} onSubmitEditing={add} />
-          <IconButton label="Add step" onPress={add} style={{ backgroundColor: meta.color }}>
-            <Plus size={18} color={colors.espresso} />
-          </IconButton>
-        </View>
+      {canAdd ? (
+        <>
+          <View style={styles.addRow}>
+            <TextInput
+              testID={`shelf-${routine}-input`}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={`Add step ${steps.length + 1}, e.g. ${routine === 'am' ? 'SPF 50' : 'Night cream'}`}
+              placeholderTextColor={colors.muted}
+              style={styles.addInput}
+              onSubmitEditing={add}
+            />
+            <IconButton label={`Add ${routine.toUpperCase()} step`} onPress={add} style={{ backgroundColor: meta.color }}>
+              <Plus size={18} color={colors.espresso} />
+            </IconButton>
+          </View>
+          <SuggestionChips
+            testID={`shelf-${routine}-suggestions`}
+            title={`${routine.toUpperCase()} step ideas`}
+            items={ideas.map((sg) => ({ key: sg.title, label: sg.title, emoji: sg.emoji }))}
+            onPick={addIdea}
+            emptyText={draft.trim() ? 'No match. Tap + to add your own.' : undefined}
+          />
+        </>
       ) : null}
     </View>
   );

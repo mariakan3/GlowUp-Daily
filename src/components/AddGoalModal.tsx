@@ -1,10 +1,12 @@
 import { Minus, Plus, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { filterSuggestions, goalSuggestions, milestoneSuggestions } from '../data/suggestions';
 import { useGlowStore } from '../store/useGlowStore';
 import { categoryMeta, categoryOrder, colors } from '../theme';
 import type { CategoryId, Goal } from '../types';
 import { Sheet } from './Sheet';
+import { SuggestionChips } from './SuggestionChips';
 import { Button, IconButton, Pill, ui } from './ui';
 
 const goalEmojis = ['🎯', '🎓', '🏃‍♀️', '🎾', '🍳', '🫧', '💼', '💸', '📖', '🧘‍♀️', '✈️', '🌱'];
@@ -31,7 +33,28 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
     return [...existing, ...Array<string>(Math.max(0, MIN_STEPS - existing.length)).fill('')];
   });
 
+  const goals = useGlowStore((s) => s.goals);
+  const existingGoals = useMemo(() => goals.map((g) => g.title), [goals]);
   const filled = steps.filter((s) => s.trim()).length;
+  const goalIdeas = goal ? [] : filterSuggestions(goalSuggestions.filter((g) => g.category === category), title, existingGoals, (g) => g.title, 6);
+  const template = goalSuggestions.find((g) => g.title.toLowerCase() === title.trim().toLowerCase());
+  const milestonePool = [...new Set([...(template?.milestones ?? []), ...milestoneSuggestions[category]])];
+  const milestoneIdeas = steps.length >= MAX_STEPS && filled >= MAX_STEPS ? [] : filterSuggestions(milestonePool, '', steps, (m) => m, 6);
+
+  const pickGoal = (key: string) => {
+    const g = goalSuggestions.find((x) => x.title === key);
+    if (!g) return;
+    setTitle(g.title);
+    setEmoji(g.emoji);
+    setCategory(g.category);
+    setSteps((prev) => (prev.some((p) => p.trim()) ? prev : g.milestones.slice(0, MAX_STEPS)));
+  };
+  const pickMilestone = (m: string) =>
+    setSteps((prev) => {
+      const i = prev.findIndex((p) => !p.trim());
+      if (i >= 0) return prev.map((p, j) => (j === i ? m : p));
+      return prev.length < MAX_STEPS ? [...prev, m] : prev;
+    });
   const canSave = title.trim().length > 0 && filled >= MIN_STEPS;
 
   const save = () => {
@@ -66,22 +89,31 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
         </View>
       }
     >
-      <Text style={ui.label}>Goal</Text>
-      <TextInput testID="goal-title-input" value={title} onChangeText={setTitle} placeholder="e.g. Run 5K under 28m" placeholderTextColor={colors.muted} style={ui.input} />
-
-      <Text style={ui.label}>Emoji</Text>
-      <View style={styles.wrap}>
-        {goalEmojis.map((e) => (
-          <Pressable key={e} onPress={() => setEmoji(e)} style={[styles.emoji, emoji === e && styles.emojiActive]}>
-            <Text style={{ fontSize: 20 }}>{e}</Text>
-          </Pressable>
-        ))}
-      </View>
-
       <Text style={ui.label}>Category</Text>
       <View style={styles.wrap}>
         {categoryOrder.map((c) => (
           <Pill key={c} small label={`${categoryMeta[c].emoji} ${categoryMeta[c].short}`} active={category === c} color={categoryMeta[c].color} tint={categoryMeta[c].tint} onPress={() => setCategory(c)} />
+        ))}
+      </View>
+
+      <Text style={ui.label}>Goal</Text>
+      <TextInput testID="goal-title-input" value={title} onChangeText={setTitle} placeholder="e.g. Run 5K under 28m" placeholderTextColor={colors.muted} style={ui.input} />
+      {!goal ? (
+        <SuggestionChips
+          testID="goal-suggestions"
+          title="Goal ideas"
+          items={goalIdeas.map((g) => ({ key: g.title, label: g.title, emoji: g.emoji }))}
+          onPick={pickGoal}
+          emptyText={title.trim() ? 'No match. Your own goal is perfect.' : undefined}
+        />
+      ) : null}
+
+      <Text style={ui.label}>Emoji</Text>
+      <View style={styles.wrap}>
+        {(goalEmojis.includes(emoji) ? goalEmojis : [emoji, ...goalEmojis]).map((e) => (
+          <Pressable key={e} onPress={() => setEmoji(e)} style={[styles.emoji, emoji === e && styles.emojiActive]}>
+            <Text style={{ fontSize: 20 }}>{e}</Text>
+          </Pressable>
         ))}
       </View>
 
@@ -104,6 +136,7 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
           ) : null}
         </View>
       ))}
+      <SuggestionChips testID="milestone-suggestions" title="Milestone ideas" items={milestoneIdeas.map((m) => ({ key: m, label: m }))} onPick={pickMilestone} />
       {steps.length < MAX_STEPS ? <Button label="Add milestone" variant="soft" icon={<Plus size={16} color={colors.espresso} />} onPress={() => setSteps((p) => [...p, ''])} /> : null}
     </Sheet>
   );

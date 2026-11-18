@@ -8,8 +8,10 @@ import { DopamineRouletteModal } from '../components/DopamineRouletteModal';
 import { EnergyModeSelector } from '../components/EnergyModeSelector';
 import { GlowProgressRing } from '../components/GlowProgressRing';
 import { RoutineShelf } from '../components/RoutineShelf';
+import { SuggestionChips } from '../components/SuggestionChips';
 import { TaskCard } from '../components/TaskCard';
-import { Card, Pill, Screen, SectionTitle } from '../components/ui';
+import { filterSuggestions, taskSuggestions } from '../data/suggestions';
+import { Button, Card, Pill, Screen, SectionTitle } from '../components/ui';
 import { fromDateKey, greetingFor } from '../lib/date';
 import { useNativeDriver, winFeedback } from '../lib/feedback';
 import { activeTasksFor } from '../lib/plan';
@@ -52,6 +54,8 @@ export function HomeScreen() {
   const routineSteps = useGlowStore((s) => s.routineSteps);
   const userName = useGlowStore((s) => s.userName);
   const toggleTask = useGlowStore((s) => s.toggleTask);
+  const addTask = useGlowStore((s) => s.addTask);
+  const pushToast = useGlowStore((s) => s.pushToast);
   const dayPlan = useGlowStore((s) => s.dayPlan);
   const snapshot = useGlowStore((s) => s.previousTasksSnapshot);
   const profile = useGlowStore((s) => s.aiScheduleProfile);
@@ -88,7 +92,7 @@ export function HomeScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.date}>{dateLabel}</Text>
             <Text style={styles.greeting}>
-              {greetingFor()}, {userName} ✨
+              {greetingFor()}{userName ? `, ${userName}` : ''} ✨
             </Text>
           </View>
           <View style={styles.streak} accessibilityLabel={`${streak} day streak`}>
@@ -183,6 +187,38 @@ export function HomeScreen() {
           ))}
         </ScrollView>
 
+        {tasks.length === 0 ? (
+          <Card style={styles.emptyCard}>
+            <Text style={styles.emptyEmoji}>🎨</Text>
+            <Text style={styles.emptyTitle}>Your day is a blank canvas</Text>
+            <Text style={styles.emptyText}>Add the little things you already do. Every one becomes a win you can tap.</Text>
+            <SuggestionChips
+              testID="today-quick-add"
+              title="Tap to add"
+              items={filterSuggestions(
+                categoryOrder.flatMap((c) => taskSuggestions.filter((t) => t.category === c).slice(0, 2)),
+                '',
+                tasks.map((t) => t.title),
+                (t) => t.title,
+                10,
+              ).map((t) => ({ key: t.title, label: t.title, emoji: t.emoji }))}
+              onPick={(title) => {
+                const sg = taskSuggestions.find((t) => t.title === title);
+                if (!sg) return;
+                const { title: tt, emoji, category, timeOfDay, tier, days, sport, minutes } = sg;
+                addTask({ title: tt, emoji, category, timeOfDay, tier, days, sport, minutes });
+                pushToast(`Added “${tt}” ✨`, 'info');
+              }}
+            />
+            <Button testID="empty-create-task" label="Create my own win" icon={<Plus size={16} color={colors.oat} />} onPress={() => setModal({ open: true, task: null })} style={{ marginTop: 16, alignSelf: 'stretch' }} />
+          </Card>
+        ) : !scheduled.length ? (
+          <Card style={styles.emptyCard}>
+            <Text style={styles.emptyEmoji}>🌙</Text>
+            <Text style={styles.emptyTitle}>Nothing scheduled today</Text>
+            <Text style={styles.emptyText}>Your routines rest today. Add a one-off win or adjust days in Routines.</Text>
+          </Card>
+        ) : null}
         {hiddenByMode > 0 ? (
           <Pressable onPress={() => setShowAll((v) => !v)} style={[styles.modeNote, { backgroundColor: energyMeta[mode].tint }]}>
             <Text style={styles.modeNoteText}>
@@ -246,12 +282,12 @@ export function HomeScreen() {
           );
         })}
 
-        {!visible.length && !showShelves ? (
+        {tasks.length > 0 && scheduled.length > 0 && !visible.length && !showShelves ? (
           <Card>
             <Text style={styles.empty}>Nothing in this category today. Add one with the + button.</Text>
           </Card>
         ) : null}
-        <Text style={styles.tip}>Tip: long-press any task to edit it.</Text>
+        {tasks.length > 0 ? <Text style={styles.tip}>Tip: long-press any task to edit it.</Text> : null}
       </Screen>
 
       <Pressable testID="add-task-fab" style={styles.fab} onPress={() => setModal({ open: true, task: null })} accessibilityRole="button" accessibilityLabel="Add task">
@@ -306,6 +342,10 @@ const styles = StyleSheet.create({
   groupTitle: { fontSize: 16, fontWeight: '800', color: colors.espresso },
   groupSub: { fontSize: 12, color: colors.espressoSoft, marginTop: 1 },
   empty: { color: colors.espressoSoft, textAlign: 'center' },
+  emptyCard: { alignItems: 'center', marginTop: 18, paddingVertical: 22 },
+  emptyEmoji: { fontSize: 36 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.espresso, marginTop: 6 },
+  emptyText: { fontSize: 13, color: colors.espressoSoft, textAlign: 'center', marginTop: 4, marginBottom: 4 },
   tip: { textAlign: 'center', fontSize: 12, color: colors.muted, marginTop: 18 },
   fab: { position: 'absolute', right: 20, bottom: 20, width: 58, height: 58, borderRadius: 29, backgroundColor: colors.espresso, alignItems: 'center', justifyContent: 'center', ...shadow, shadowOpacity: 0.25 },
 });

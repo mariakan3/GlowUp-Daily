@@ -1,12 +1,14 @@
 import { Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { filterSuggestions, taskSuggestions } from '../data/suggestions';
 import { ALL_DAYS, weekdayShort } from '../lib/date';
 import { winFeedback } from '../lib/feedback';
 import { useGlowStore } from '../store/useGlowStore';
 import { categoryMeta, categoryOrder, colors, radius, timeOfDayMeta, timeOfDayOrder } from '../theme';
-import type { CategoryId, Task, TaskTier, TimeOfDay, Weekday } from '../types';
+import type { CategoryId, SportId, Task, TaskTier, TimeOfDay, Weekday } from '../types';
 import { Sheet } from './Sheet';
+import { SuggestionChips } from './SuggestionChips';
 import { Button, Pill, ui } from './ui';
 
 const emojiChoices = ['✨', '🛁', '🧴', '💇‍♀️', '🛌', '🧺', '🍳', '🥤', '📖', '🧠', '💻', '🎾', '🧘‍♀️', '🏃‍♀️', '🌸', '🪴', '💌', '🕯️'];
@@ -17,32 +19,57 @@ const tierOptions: { value: TaskTier; label: string; hint: string }[] = [
   { value: 3, label: '🚀 High Era', hint: 'Only on full-schedule days' },
 ];
 
-type Props = { visible: boolean; onClose: () => void; task?: Task | null };
+type Props = { visible: boolean; onClose: () => void; task?: Task | null; initialCategory?: CategoryId };
 
 export function AddTaskModal(props: Props) {
   if (!props.visible) return null;
   return <AddTaskForm key={props.task?.id ?? 'new'} {...props} />;
 }
 
-function AddTaskForm({ visible, onClose, task }: Props) {
+function AddTaskForm({ visible, onClose, task, initialCategory }: Props) {
   const addTask = useGlowStore((s) => s.addTask);
   const updateTask = useGlowStore((s) => s.updateTask);
   const deleteTask = useGlowStore((s) => s.deleteTask);
   const pushToast = useGlowStore((s) => s.pushToast);
+  const allTasks = useGlowStore((s) => s.tasks);
+  const existingTitles = useMemo(() => allTasks.map((t) => t.title), [allTasks]);
 
   const [title, setTitle] = useState(task?.title ?? '');
   const [emoji, setEmoji] = useState(task?.emoji ?? '✨');
-  const [category, setCategory] = useState<CategoryId>(task?.category ?? 'selfcare');
+  const [category, setCategory] = useState<CategoryId>(task?.category ?? initialCategory ?? 'morning');
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>(task?.timeOfDay ?? 'evening');
   const [tier, setTier] = useState<TaskTier>(task?.tier ?? 2);
   const [days, setDays] = useState<Weekday[]>(task?.days ?? ALL_DAYS);
+  const [sport, setSport] = useState<SportId | undefined>(task?.sport);
+  const [minutes, setMinutes] = useState<number | undefined>(task?.minutes);
+
+  const suggestions = task
+    ? []
+    : filterSuggestions(
+        taskSuggestions.filter((sg) => sg.category === category),
+        title,
+        existingTitles,
+        (sg) => sg.title,
+      );
+  const pickSuggestion = (key: string) => {
+    const sg = taskSuggestions.find((x) => x.title === key);
+    if (!sg) return;
+    setTitle(sg.title);
+    setEmoji(sg.emoji);
+    setTimeOfDay(sg.timeOfDay);
+    setTier(sg.tier);
+    setDays(sg.days);
+    setSport(sg.sport);
+    setMinutes(sg.minutes);
+  };
+  const emojis = emojiChoices.includes(emoji) ? emojiChoices : [emoji, ...emojiChoices];
 
   const toggleDay = (d: Weekday) => setDays((prev) => (prev.includes(d) ? (prev.length > 1 ? prev.filter((x) => x !== d) : prev) : [...prev, d].sort()));
 
   const canSave = title.trim().length > 0;
   const save = () => {
     if (!canSave) return;
-    const input = { title: title.trim(), emoji, category, timeOfDay, tier, days };
+    const input = { title: title.trim(), emoji, category, timeOfDay, tier, days, sport, minutes };
     if (task) {
       updateTask(task.id, input);
       pushToast('Task updated 💫', 'info');
@@ -74,6 +101,24 @@ function AddTaskForm({ visible, onClose, task }: Props) {
         </View>
       }
     >
+      <Text style={ui.label}>Category</Text>
+      <View style={styles.wrap}>
+        {categoryOrder.map((c) => (
+          <Pill
+            key={c}
+            small
+            label={`${categoryMeta[c].emoji} ${categoryMeta[c].short}`}
+            active={category === c}
+            color={categoryMeta[c].color}
+            tint={categoryMeta[c].tint}
+            onPress={() => {
+              setCategory(c);
+              if (c !== 'movement') setSport(undefined);
+            }}
+          />
+        ))}
+      </View>
+
       <Text style={ui.label}>What’s the win?</Text>
       <TextInput
         testID="task-title-input"
@@ -85,28 +130,22 @@ function AddTaskForm({ visible, onClose, task }: Props) {
         onSubmitEditing={save}
         returnKeyType="done"
       />
+      {!task ? (
+        <SuggestionChips
+          testID="task-suggestions"
+          title={`${categoryMeta[category].short} ideas`}
+          items={suggestions.map((sg) => ({ key: sg.title, label: sg.title, emoji: sg.emoji }))}
+          onPick={pickSuggestion}
+          emptyText={title.trim() ? 'No match. Your own idea works perfectly.' : 'You already have every idea here. Write your own!'}
+        />
+      ) : null}
 
       <Text style={ui.label}>Emoji</Text>
       <View style={styles.wrap}>
-        {emojiChoices.map((e) => (
+        {emojis.map((e) => (
           <Pressable key={e} onPress={() => setEmoji(e)} style={[styles.emoji, emoji === e && styles.emojiActive]} accessibilityLabel={`Emoji ${e}`}>
             <Text style={{ fontSize: 20 }}>{e}</Text>
           </Pressable>
-        ))}
-      </View>
-
-      <Text style={ui.label}>Category</Text>
-      <View style={styles.wrap}>
-        {categoryOrder.map((c) => (
-          <Pill
-            key={c}
-            small
-            label={`${categoryMeta[c].emoji} ${categoryMeta[c].short}`}
-            active={category === c}
-            color={categoryMeta[c].color}
-            tint={categoryMeta[c].tint}
-            onPress={() => setCategory(c)}
-          />
         ))}
       </View>
 

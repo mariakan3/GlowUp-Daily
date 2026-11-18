@@ -3,7 +3,9 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { GlowProgressRing } from '../components/GlowProgressRing';
 import { Button, Card, IconButton, Pill, ProgressBar, SectionTitle, ui } from '../components/ui';
-import { focusPresets } from '../data/seed';
+import { DEFAULT_FOCUS_SUBJECT, focusPresets } from '../data/presets';
+import { filterSuggestions, subjectSuggestions } from '../data/suggestions';
+import { SuggestionChips } from '../components/SuggestionChips';
 import { formatClock, formatDuration, lastSevenDays, weekdayLabel, weekdayOf } from '../lib/date';
 import { winFeedback } from '../lib/feedback';
 import { useNow, useToday } from '../lib/hooks';
@@ -37,6 +39,12 @@ export function StudyScreen() {
   ).sort((a, b) => b[1] - a[1]);
   const recent = [...sessions].sort((a, b) => b.ts - a.ts).slice(0, 4);
 
+  const subjectIdeas = filterSuggestions(subjectSuggestions, newSubject, subjects, (x) => x, 8);
+  const pickSubject = (sub: string) => {
+    addSubject(sub);
+    setNewSubject('');
+    setAdding(false);
+  };
   const submitSubject = () => {
     addSubject(newSubject);
     setNewSubject('');
@@ -46,7 +54,7 @@ export function StudyScreen() {
   return (
     <View>
       <Card style={{ alignItems: 'center', paddingVertical: 22 }}>
-        <Text style={styles.phaseLabel}>{timer.phase === 'idle' ? 'Ready when you are' : isBreak ? '🌿 Break time' : `📚 Focusing on ${timer.subject}`}</Text>
+        <Text style={styles.phaseLabel}>{timer.phase === 'idle' ? 'Ready when you are' : isBreak ? '🌿 Break time' : `📚 Focusing on ${timer.subject || DEFAULT_FOCUS_SUBJECT}`}</Text>
         <GlowProgressRing progress={progress} size={200} stroke={14} color={isBreak ? colors.matcha : colors.lilac} secondaryColor={isBreak ? colors.matcha : colors.peach} glow={isBreak ? colors.matchaTint : colors.lilacTint}>
           <Text style={styles.clock} testID="focus-clock">
             {formatClock(remaining)}
@@ -108,11 +116,15 @@ export function StudyScreen() {
         {subjects.map((s) => (
           <Pill key={s} label={s} active={timer.subject === s} color={colors.butter} tint={colors.butterTint} onPress={() => setTimerSubject(s)} />
         ))}
-        {!adding ? <Pill label="+ New tag" onPress={() => setAdding(true)} color={colors.cardSoft} tint={colors.cardSoft} /> : null}
+        {!adding ? <Pill testID="subject-add" label="+ New tag" onPress={() => setAdding(true)} color={colors.cardSoft} tint={colors.cardSoft} /> : null}
       </View>
+      {!subjects.length && !adding ? <Text style={ui.muted}>No subjects yet. Sprints count as “{DEFAULT_FOCUS_SUBJECT}” until you add one.</Text> : null}
+      {adding || !subjects.length ? (
+        <SuggestionChips testID="subject-suggestions" title="Subject ideas" horizontal items={subjectIdeas.map((x) => ({ key: x, label: x }))} onPick={pickSubject} />
+      ) : null}
       {adding ? (
         <View style={styles.addRow}>
-          <TextInput autoFocus value={newSubject} onChangeText={setNewSubject} placeholder="e.g. Microeconomics" placeholderTextColor={colors.muted} style={[ui.input, { flex: 1 }]} onSubmitEditing={submitSubject} />
+          <TextInput testID="subject-input" autoFocus value={newSubject} onChangeText={setNewSubject} placeholder="e.g. Microeconomics" placeholderTextColor={colors.muted} style={[ui.input, { flex: 1 }]} onSubmitEditing={submitSubject} />
           <IconButton label="Add subject" onPress={submitSubject} style={{ backgroundColor: colors.butter, width: 44, height: 44, borderRadius: 22 }}>
             <Plus size={18} color={colors.espresso} />
           </IconButton>
