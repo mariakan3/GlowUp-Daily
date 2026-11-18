@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react-native';
+import { Check, Sparkles } from 'lucide-react-native';
 import { memo, useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { isWeb, useNativeDriver, winFeedback } from '../lib/feedback';
@@ -15,11 +15,12 @@ interface Props {
   winLabel?: string;
   dimmed?: boolean;
   onLongPress?: () => void;
+  onSplit?: () => void;
   testID?: string;
 }
 
 /** One-tap micro-win row: haptic (or web bounce), check pop, strike-through and +1 chip. */
-export const TaskCard = memo(function TaskCard({ title, emoji, category, done, onToggle, meta, winLabel = '+1', dimmed, onLongPress, testID }: Props) {
+export const TaskCard = memo(function TaskCard({ title, emoji, category, done, onToggle, meta, winLabel = '+1', dimmed, onLongPress, onSplit, testID }: Props) {
   const cat = categoryMeta[category];
   const scale = useState(() => new Animated.Value(1))[0];
   const check = useState(() => new Animated.Value(done ? 1 : 0))[0];
@@ -62,6 +63,22 @@ export const TaskCard = memo(function TaskCard({ title, emoji, category, done, o
           </Text>
           {meta ? <Text style={styles.meta}>{meta}</Text> : null}
         </View>
+        {!done && onSplit ? (
+          <Pressable
+            testID={testID ? `${testID}-split` : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={`Split ${title} into 3 micro-wins`}
+            hitSlop={6}
+            onPress={() => {
+              winFeedback('tap');
+              onSplit();
+            }}
+            style={({ pressed }) => [styles.split, pressed && { opacity: 0.6 }]}
+          >
+            <Sparkles size={12} color={colors.espresso} />
+            <Text style={styles.splitText}>Split</Text>
+          </Pressable>
+        ) : null}
         {!done ? (
           <View style={[styles.winChip, { backgroundColor: cat.tint }]}>
             <Text style={styles.winChipText}>{winLabel}</Text>
@@ -95,6 +112,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: '600', color: colors.espresso },
   titleDone: { textDecorationLine: 'line-through', color: colors.espressoSoft },
   meta: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  split: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.lilacTint },
+  splitText: { fontSize: 11, fontWeight: '800', color: colors.espresso },
   winChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
   winChipText: { fontSize: 11, fontWeight: '800', color: colors.espressoSoft },
   checkbox: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },

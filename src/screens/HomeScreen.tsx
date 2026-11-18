@@ -1,21 +1,49 @@
 import { router } from 'expo-router';
 import { ChevronDown, ChevronUp, Plus, Timer } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddTaskModal } from '../components/AddTaskModal';
+import { AIConciergeModal } from '../components/AIConciergeModal';
+import { DopamineRouletteModal } from '../components/DopamineRouletteModal';
 import { EnergyModeSelector } from '../components/EnergyModeSelector';
 import { GlowProgressRing } from '../components/GlowProgressRing';
 import { RoutineShelf } from '../components/RoutineShelf';
 import { TaskCard } from '../components/TaskCard';
 import { Card, Pill, Screen, SectionTitle } from '../components/ui';
-import { fromDateKey, greetingFor, weekdayOf } from '../lib/date';
+import { fromDateKey, greetingFor } from '../lib/date';
+import { useNativeDriver, winFeedback } from '../lib/feedback';
+import { activeTasksFor } from '../lib/plan';
 import { useTodayStats } from '../lib/hooks';
-import { isDone, isTaskScheduled, isTaskVisibleInMode } from '../lib/wins';
+import { isDone, isTaskVisibleInMode } from '../lib/wins';
 import { useGlowStore } from '../store/useGlowStore';
 import { auraFor, auraLevels, categoryMeta, categoryOrder, colors, energyMeta, radius, shadow, timeOfDayMeta, timeOfDayOrder } from '../theme';
 import type { CategoryId, Task, TimeOfDay } from '../types';
 
 type Filter = 'all' | CategoryId;
+
+function RemixHeroPill({ onPress }: { onPress: () => void }) {
+  const [glow] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver }),
+        Animated.timing(glow, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glow]);
+  const opacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.85] });
+  const scale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+  return (
+    <Pressable testID="ai-remix-open" accessibilityRole="button" onPress={onPress} style={{ flex: 1.35 }}>
+      <Animated.View pointerEvents="none" style={[styles.heroGlow, { opacity, transform: [{ scale }] }]} />
+      <View style={styles.heroPill}>
+        <Text style={styles.heroText}>✨ AI Remix My Day</Text>
+      </View>
+    </Pressable>
+  );
+}
 
 export function HomeScreen() {
   const { today, mode, target, wins, streak } = useTodayStats();
@@ -24,6 +52,13 @@ export function HomeScreen() {
   const routineSteps = useGlowStore((s) => s.routineSteps);
   const userName = useGlowStore((s) => s.userName);
   const toggleTask = useGlowStore((s) => s.toggleTask);
+  const dayPlan = useGlowStore((s) => s.dayPlan);
+  const snapshot = useGlowStore((s) => s.previousTasksSnapshot);
+  const profile = useGlowStore((s) => s.aiScheduleProfile);
+  const revertAIRemix = useGlowStore((s) => s.revertAIRemix);
+  const splitTask = useGlowStore((s) => s.splitTaskIntoMicroWins);
+  const [conciergeOpen, setConciergeOpen] = useState(false);
+  const [rouletteOpen, setRouletteOpen] = useState(false);
 
   const [filter, setFilter] = useState<Filter>('all');
   const [showAll, setShowAll] = useState(false);
@@ -32,9 +67,9 @@ export function HomeScreen() {
 
   const aura = auraFor(wins);
   const nextAura = auraLevels.find((l) => l.min > wins);
-  const weekday = weekdayOf(today);
-
-  const scheduled = useMemo(() => tasks.filter((t) => isTaskScheduled(t, weekday)).sort((a, b) => a.order - b.order), [tasks, weekday]);
+  const scheduled = useMemo(() => activeTasksFor(tasks, dayPlan, today), [tasks, dayPlan, today]);
+  const remixedToday = profile?.date === today && dayPlan?.date === today;
+  const canUndo = snapshot?.date === today;
   const hiddenByMode = scheduled.filter((t) => !isTaskVisibleInMode(t, mode)).length;
   const visible = scheduled.filter((t) => (showAll || isTaskVisibleInMode(t, mode)) && (filter === 'all' || t.category === filter));
   const showShelves = filter === 'all' || filter === 'selfcare';
@@ -60,6 +95,34 @@ export function HomeScreen() {
             <Text style={styles.streakText}>🔥 {streak} Day Streak</Text>
           </View>
         </View>
+
+        <View style={styles.heroRow}>
+          <RemixHeroPill onPress={() => setConciergeOpen(true)} />
+          <Pressable
+            testID="quick-win-open"
+            accessibilityRole="button"
+            onPress={() => {
+              winFeedback('tap');
+              setRouletteOpen(true);
+            }}
+            style={({ pressed }) => [styles.quickWin, pressed && { transform: [{ scale: 0.97 }] }]}
+          >
+            <Text style={styles.quickWinText}>🎲 Need a Quick Win?</Text>
+          </Pressable>
+        </View>
+
+        {remixedToday || canUndo ? (
+          <View style={styles.remixBanner} testID="remix-banner">
+            <Text style={styles.remixText} numberOfLines={3}>
+              {remixedToday && profile ? `${profile.summary}${profile.fallbackReason ? ' (Smart Rules backup)' : ''}` : 'Your previous day plan is ready to restore.'}
+            </Text>
+            {canUndo ? (
+              <Pressable testID="undo-remix" accessibilityRole="button" onPress={() => { winFeedback('undo'); revertAIRemix(); }} style={styles.undoPill}>
+                <Text style={styles.undoText}>↩️ Undo AI Remix</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
 
         <Card style={styles.ringCard}>
           <GlowProgressRing progress={wins / target} color={aura.color} secondaryColor={wins >= target ? colors.matcha : aura.color} glow={aura.glow} pulseKey={wins} size={210}>
@@ -170,7 +233,9 @@ export function HomeScreen() {
                       done={isDone(events, today, 'task', t.id)}
                       onToggle={() => toggleTask(t.id)}
                       onLongPress={() => setModal({ open: true, task: t })}
-                      meta={`${categoryMeta[t.category].emoji} ${categoryMeta[t.category].short}${t.tier === 1 ? ' · Essential' : ''}`}
+                      meta={t.remixNote ?? `${categoryMeta[t.category].emoji} ${categoryMeta[t.category].short}${t.tier === 1 ? ' · Essential' : ''}`}
+                      winLabel={`+${t.wins ?? 1}`}
+                      onSplit={t.splitFrom ? undefined : () => splitTask(t.id)}
                       dimmed={!isTaskVisibleInMode(t, mode)}
                     />
                   ))}
@@ -194,6 +259,8 @@ export function HomeScreen() {
       </Pressable>
 
       <AddTaskModal visible={modal.open} task={modal.task} onClose={() => setModal({ open: false, task: null })} />
+      <AIConciergeModal visible={conciergeOpen} onClose={() => setConciergeOpen(false)} />
+      <DopamineRouletteModal visible={rouletteOpen} onClose={() => setRouletteOpen(false)} />
     </View>
   );
 }
@@ -204,6 +271,16 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 24, fontWeight: '800', color: colors.espresso, letterSpacing: -0.5, marginTop: 2 },
   streak: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.peachTint, paddingHorizontal: 12, paddingVertical: 8, borderRadius: radius.pill },
   streakText: { fontSize: 13, fontWeight: '800', color: colors.espresso },
+  heroRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  heroGlow: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.pill, backgroundColor: colors.lilac },
+  heroPill: { borderRadius: radius.pill, paddingVertical: 14, alignItems: 'center', backgroundColor: colors.espresso, margin: 3 },
+  heroText: { fontSize: 15, fontWeight: '800', color: colors.oat },
+  quickWin: { flex: 1, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.butterTint, borderWidth: 1.5, borderColor: colors.butter, marginVertical: 3 },
+  quickWinText: { fontSize: 13, fontWeight: '800', color: colors.espresso },
+  remixBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.lilacTint, borderRadius: radius.md, padding: 12, marginBottom: 12 },
+  remixText: { flex: 1, fontSize: 12, color: colors.espresso, fontWeight: '600' },
+  undoPill: { backgroundColor: colors.card, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8 },
+  undoText: { fontSize: 12, fontWeight: '800', color: colors.espresso },
   ringCard: { alignItems: 'center', paddingVertical: 24 },
   ringLabel: { fontSize: 13, color: colors.muted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   ringCount: { fontSize: 54, fontWeight: '900', color: colors.espresso, letterSpacing: -2 },

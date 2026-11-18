@@ -17,19 +17,19 @@ import { isTaskVisibleInMode, isTaskScheduled } from '../lib/wins';
 type SeedTask = Omit<Task, 'order' | 'custom'>;
 
 const seedTaskList: SeedTask[] = [
-  { id: 't-bed', title: 'Make the bed', emoji: '🛏️', category: 'morning', timeOfDay: 'morning', tier: 1, days: ALL_DAYS },
-  { id: 't-water', title: 'Drink a glass of water', emoji: '💧', category: 'morning', timeOfDay: 'morning', tier: 1, days: ALL_DAYS },
-  { id: 't-curtains', title: 'Open the curtains & let light in', emoji: '🌤️', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
-  { id: 't-vitamins', title: 'Take vitamins', emoji: '💊', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
-  { id: 't-top3', title: 'Plan top 3 priorities', emoji: '📝', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
+  { id: 't-bed', minutes: 2, title: 'Make the bed', emoji: '🛏️', category: 'morning', timeOfDay: 'morning', tier: 1, days: ALL_DAYS },
+  { id: 't-water', minutes: 1, title: 'Drink a glass of water', emoji: '💧', category: 'morning', timeOfDay: 'morning', tier: 1, days: ALL_DAYS },
+  { id: 't-curtains', minutes: 1, title: 'Open the curtains & let light in', emoji: '🌤️', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
+  { id: 't-vitamins', minutes: 1, title: 'Take vitamins', emoji: '💊', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
+  { id: 't-top3', minutes: 3, title: 'Plan top 3 priorities', emoji: '📝', category: 'morning', timeOfDay: 'morning', tier: 2, days: ALL_DAYS },
   { id: 't-coffee', title: 'Prep lunch & iced coffee', emoji: '☕', category: 'home', timeOfDay: 'morning', tier: 2, days: [1, 2, 3, 4, 5] },
 
   { id: 't-study', title: 'Deep study block', emoji: '📚', category: 'studies', timeOfDay: 'daytime', tier: 1, days: ALL_DAYS },
-  { id: 't-refill', title: 'Refill water bottle', emoji: '🫗', category: 'morning', timeOfDay: 'daytime', tier: 1, days: ALL_DAYS },
+  { id: 't-refill', minutes: 2, title: 'Refill water bottle', emoji: '🫗', category: 'morning', timeOfDay: 'daytime', tier: 1, days: ALL_DAYS },
   { id: 't-lecture', title: 'Lecture review & notes', emoji: '🎧', category: 'studies', timeOfDay: 'daytime', tier: 2, days: [1, 2, 3, 4, 5] },
   { id: 't-flashcards', title: 'Exam prep flashcards', emoji: '🗂️', category: 'studies', timeOfDay: 'daytime', tier: 2, days: ALL_DAYS },
   { id: 't-inbox', title: 'Work tasks & inbox zero', emoji: '💼', category: 'studies', timeOfDay: 'daytime', tier: 3, days: [1, 2, 3, 4, 5] },
-  { id: 't-desk', title: 'Clear your desk', emoji: '🪴', category: 'home', timeOfDay: 'daytime', tier: 3, days: ALL_DAYS },
+  { id: 't-desk', minutes: 2, title: 'Clear your desk', emoji: '🪴', category: 'home', timeOfDay: 'daytime', tier: 3, days: ALL_DAYS },
   { id: 't-pilates', title: 'Pilates reformer class', emoji: '🧘‍♀️', category: 'movement', timeOfDay: 'daytime', tier: 3, days: [1, 3, 5], sport: 'pilates' },
   { id: 't-tennis', title: 'Tennis practice', emoji: '🎾', category: 'movement', timeOfDay: 'daytime', tier: 3, days: [2, 4, 6], sport: 'tennis' },
   { id: 't-gym', title: 'Gym session', emoji: '🏋️‍♀️', category: 'movement', timeOfDay: 'daytime', tier: 3, days: [1, 4], sport: 'gym' },

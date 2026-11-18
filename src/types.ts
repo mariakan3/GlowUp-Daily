@@ -23,6 +23,14 @@ export interface Task {
   order: number;
   sport?: SportId;
   custom: boolean;
+  /** Wins awarded on completion; defaults to 1. */
+  wins?: number;
+  /** Rough effort estimate, used by the Quick Win roulette (≤ 2 = instant). */
+  minutes?: number;
+  /** Set on tasks the AI Concierge created or rewrote; shown as a hint under the title. */
+  remixNote?: string;
+  splitFrom?: string;
+  step?: number;
 }
 
 export type RoutineId = 'am' | 'pm';
@@ -35,7 +43,7 @@ export interface RoutineStep {
   order: number;
 }
 
-export type WinSource = 'task' | 'routine' | 'focus' | 'movement' | 'milestone';
+export type WinSource = 'task' | 'routine' | 'focus' | 'movement' | 'milestone' | 'roulette' | 'bonus';
 
 export interface WinEvent {
   id: string;
@@ -128,4 +136,56 @@ export interface GoalInput {
   emoji: string;
   category: CategoryId;
   milestones: string[];
+}
+
+export type DayPresetId = 'exam' | 'thatgirl' | 'cozy' | 'busy';
+export type BatteryLevel = 'low' | 'medium' | 'unstoppable';
+export type MovementPick = 'tennis' | 'pilates' | 'gym' | 'run' | 'rest';
+export type HomeTime = 10 | 30 | 60;
+export type AIProvider = 'off' | 'openai' | 'gemini';
+export type PlannerEngine = 'rules' | 'openai' | 'gemini';
+
+export interface RemixInput {
+  presetId: DayPresetId | null;
+  battery: BatteryLevel;
+  movement: MovementPick;
+  homeTime: HomeTime;
+  prompt: string;
+}
+
+export interface RemixResult {
+  tasks: Task[];
+  energyMode: EnergyMode;
+  summary: string;
+  changes: string[];
+  engine: PlannerEngine;
+  fallbackReason?: string;
+}
+
+export interface AIScheduleProfile extends RemixInput {
+  date: string;
+  appliedAt: number;
+  engine: PlannerEngine;
+  summary: string;
+  changes: string[];
+  fallbackReason?: string;
+}
+
+/** Today's active checklist when it differs from the weekday templates (after a remix or split). */
+export interface DayPlan {
+  date: string;
+  tasks: Task[];
+}
+
+export interface TasksSnapshot {
+  date: string;
+  plan: Task[] | null;
+  mode: EnergyMode;
+  profile: AIScheduleProfile | null;
+}
+
+export interface AISettings {
+  provider: AIProvider;
+  model: string;
+  hasKey: boolean;
 }

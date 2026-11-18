@@ -3,10 +3,20 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { buildSeedHistory, focusPresets, seedGoals, seedRoutineSteps, seedSubjects, seedTasks } from '../data/seed';
 import { todayKey, weekdayOf } from '../lib/date';
-import { isDone, isTaskScheduled } from '../lib/wins';
+import { uid } from '../lib/id';
+import { activeTasksFor, doneTaskIds, shelfWinsFor } from '../lib/plan';
+import { getApiKey } from '../lib/secureKey';
+import { isDone, isTaskScheduled, modeOn } from '../lib/wins';
+import { DEFAULT_MODELS, planDay, splitIntoMicroWins, type QuickWinCandidate } from '../services/aiPlannerService';
 import { sportMeta } from '../theme';
 import type {
+  AIScheduleProfile,
+  AISettings,
+  DayPlan,
   EnergyMode,
+  RemixInput,
+  RemixResult,
+  TasksSnapshot,
   FocusSession,
   Goal,
   GoalInput,
@@ -24,8 +34,7 @@ import type {
   WinEvent,
 } from '../types';
 
-let idCounter = 0;
-export const uid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export { uid };
 
 const idleTimer: TimerState = {
   phase: 'idle',
@@ -47,6 +56,10 @@ interface PersistedState {
   movementSessions: MovementSession[];
   goals: Goal[];
   userName: string;
+  dayPlan: DayPlan | null;
+  previousTasksSnapshot: TasksSnapshot | null;
+  aiScheduleProfile: AIScheduleProfile | null;
+  aiSettings: AISettings;
 }
 
 interface GlowState extends PersistedState {
@@ -86,6 +99,12 @@ interface GlowState extends PersistedState {
   deleteGoal: (id: string) => void;
   toggleMilestone: (goalId: string, milestoneId: string) => boolean;
 
+  applyAIRemix: (input: RemixInput) => Promise<RemixResult>;
+  revertAIRemix: () => void;
+  splitTaskIntoMicroWins: (taskId: string) => void;
+  completeQuickWin: (candidate: QuickWinCandidate, beatTimer: boolean) => void;
+  setAISettings: (patch: Partial<AISettings>) => void;
+
   resetDemoData: () => void;
 }
 
@@ -105,8 +124,15 @@ function createSeedState(): PersistedState {
     movementSessions: history.movementSessions,
     goals,
     userName: 'Maria',
+    dayPlan: null,
+    previousTasksSnapshot: null,
+    aiScheduleProfile: null,
+    aiSettings: { provider: 'off', model: DEFAULT_MODELS.openai, hasKey: false },
   };
 }
+
+const todayPlanOf = (s: Pick<PersistedState, 'tasks' | 'dayPlan'>, date: string) => activeTasksFor(s.tasks, s.dayPlan, date);
+const winText = (n: number) => `+${n} Win${n === 1 ? '' : 's'} ✨`;
 
 export function presetById(id: string) {
   return focusPresets.find((p) => p.id === id) ?? focusPresets[0];
@@ -124,29 +150,42 @@ export const useGlowStore = create<GlowState>()(
 
       toggleTask: (taskId) => {
         const date = todayKey();
-        const { events, tasks } = get();
-        const task = tasks.find((t) => t.id === taskId);
+        const state = get();
+        const { events } = state;
+        const task = todayPlanOf(state, date).find((t) => t.id === taskId) ?? state.tasks.find((t) => t.id === taskId);
         if (!task) return false;
         if (isDone(events, date, 'task', taskId)) {
           set({ events: events.filter((e) => !(e.date === date && e.source === 'task' && e.refId === taskId)) });
           return false;
         }
-        const ev: WinEvent = { id: uid('w'), date, ts: Date.now(), source: 'task', refId: taskId, amount: 1, category: task.category, label: task.title };
+        const amount = task.wins ?? 1;
+        const ev: WinEvent = { id: uid('w'), date, ts: Date.now(), source: 'task', refId: taskId, amount, category: task.category, label: task.title };
         set({ events: [...events, ev] });
-        get().pushToast('+1 Win ✨');
+        get().pushToast(winText(amount));
         return true;
       },
 
       addTask: (input) =>
-        set((s) => ({
-          tasks: [...s.tasks, { ...input, id: uid('t'), order: Math.max(-1, ...s.tasks.map((t) => t.order)) + 1, custom: true }],
-        })),
+        set((s) => {
+          const task: Task = { ...input, id: uid('t'), order: Math.max(-1, ...s.tasks.map((t) => t.order)) + 1, custom: true };
+          const date = todayKey();
+          const inPlan = s.dayPlan?.date === date && isTaskScheduled(task, weekdayOf(date));
+          return {
+            tasks: [...s.tasks, task],
+            dayPlan: inPlan && s.dayPlan ? { ...s.dayPlan, tasks: [...s.dayPlan.tasks, { ...task, order: Math.max(-1, ...s.dayPlan.tasks.map((t) => t.order)) + 1 }] } : s.dayPlan,
+          };
+        }),
 
-      updateTask: (id, input) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...input } : t)) })),
+      updateTask: (id, input) =>
+        set((s) => ({
+          tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...input } : t)),
+          dayPlan: s.dayPlan ? { ...s.dayPlan, tasks: s.dayPlan.tasks.map((t) => (t.id === id ? { ...t, ...input } : t)) } : null,
+        })),
 
       deleteTask: (id) =>
         set((s) => ({
           tasks: s.tasks.filter((t) => t.id !== id),
+          dayPlan: s.dayPlan ? { ...s.dayPlan, tasks: s.dayPlan.tasks.filter((t) => t.id !== id) } : null,
           events: s.events.filter((e) => !(e.source === 'task' && e.refId === id && e.date === todayKey())),
         })),
 
@@ -261,17 +300,17 @@ export const useGlowStore = create<GlowState>()(
       logMovement: ({ sport, minutes, vibe, note }) => {
         const date = todayKey();
         const now = Date.now();
-        const { tasks, events } = get();
-        const weekday = weekdayOf(date);
-        const linked = tasks
-          .filter((t) => t.sport === sport && isTaskScheduled(t, weekday))
+        const state = get();
+        const { events } = state;
+        const linked = todayPlanOf(state, date)
+          .filter((t) => t.sport === sport)
           .find((t) => !isDone(events, date, 'task', t.id));
         const ev: WinEvent = linked
-          ? { id: uid('w'), date, ts: now, source: 'task', refId: linked.id, amount: 1, category: 'movement', label: linked.title }
+          ? { id: uid('w'), date, ts: now, source: 'task', refId: linked.id, amount: linked.wins ?? 1, category: 'movement', label: linked.title }
           : { id: uid('w'), date, ts: now, source: 'movement', refId: sport, amount: 1, category: 'movement', label: `${sportMeta[sport].label} ${minutes}m` };
         const session: MovementSession = { id: uid('mv'), date, ts: now, sport, minutes, vibe, note: note.trim(), winEventId: ev.id };
         set((s) => ({ events: [...s.events, ev], movementSessions: [...s.movementSessions, session] }));
-        get().pushToast(`+1 Win ${vibe} ${sportMeta[sport].label} logged`);
+        get().pushToast(`+${ev.amount} Win${ev.amount === 1 ? '' : 's'} ${vibe} ${sportMeta[sport].label} logged`);
       },
 
       deleteMovement: (id) =>
@@ -334,7 +373,92 @@ export const useGlowStore = create<GlowState>()(
         return nowDone;
       },
 
-      resetDemoData: () => set({ ...createSeedState(), toasts: [] }),
+      applyAIRemix: async (input) => {
+        const date = todayKey();
+        const state = get();
+        const active = todayPlanOf(state, date);
+        const ctx = {
+          tasks: active,
+          doneIds: doneTaskIds(state.events, date),
+          subject: state.timer.subject,
+          shelfWins: (mode: EnergyMode) => shelfWinsFor(state.routineSteps, mode),
+        };
+        const apiKey = state.aiSettings.provider === 'off' ? null : await getApiKey();
+        const result = await planDay(input, ctx, state.aiSettings, apiKey);
+        const latest = get();
+        set({
+          previousTasksSnapshot: {
+            date,
+            plan: latest.dayPlan?.date === date ? latest.dayPlan.tasks : null,
+            mode: modeOn(latest.dayModes, date),
+            profile: latest.aiScheduleProfile?.date === date ? latest.aiScheduleProfile : null,
+          },
+          dayPlan: { date, tasks: result.tasks },
+          dayModes: { ...latest.dayModes, [date]: result.energyMode },
+          aiScheduleProfile: {
+            ...input,
+            date,
+            appliedAt: Date.now(),
+            engine: result.engine,
+            summary: result.summary,
+            changes: result.changes,
+            fallbackReason: result.fallbackReason,
+          },
+        });
+        get().pushToast(result.fallbackReason ? '✨ Day remixed with Smart Rules' : '✨ Your day is remixed', 'super');
+        return result;
+      },
+
+      revertAIRemix: () => {
+        const date = todayKey();
+        const s = get();
+        const snap = s.previousTasksSnapshot;
+        if (!snap || snap.date !== date) return;
+        const base = snap.plan ?? activeTasksFor(s.tasks, null, date);
+        const baseIds = new Set(base.map((t) => t.id));
+        const done = doneTaskIds(s.events, date);
+        const keptWins = (s.dayPlan?.date === date ? s.dayPlan.tasks : []).filter((t) => done.has(t.id) && !baseIds.has(t.id));
+        set({
+          dayPlan: snap.plan || keptWins.length ? { date, tasks: [...base, ...keptWins.map((t, i) => ({ ...t, tier: 1 as const, order: base.length + i }))] } : null,
+          dayModes: { ...s.dayModes, [date]: snap.mode },
+          aiScheduleProfile: snap.profile,
+          previousTasksSnapshot: null,
+        });
+        get().pushToast(keptWins.length ? '↩️ Remix undone. Wins you earned stay' : '↩️ AI Remix undone', 'info');
+      },
+
+      splitTaskIntoMicroWins: (taskId) => {
+        const date = todayKey();
+        const s = get();
+        const active = todayPlanOf(s, date);
+        const task = active.find((t) => t.id === taskId);
+        if (!task || isDone(s.events, date, 'task', taskId)) return;
+        const steps = splitIntoMicroWins(task);
+        const tasks = active.flatMap((t) => (t.id === taskId ? steps : [t])).map((t, i) => ({ ...t, order: i }));
+        set({ dayPlan: { date, tasks } });
+        get().pushToast('✨ Split into 3 micro-wins', 'info');
+      },
+
+      completeQuickWin: (candidate, beatTimer) => {
+        const date = todayKey();
+        const now = Date.now();
+        if (candidate.taskId) {
+          if (!isDone(get().events, date, 'task', candidate.taskId)) get().toggleTask(candidate.taskId);
+        } else {
+          const ev: WinEvent = { id: uid('w'), date, ts: now, source: 'roulette', refId: candidate.key, amount: 1, category: candidate.category, label: candidate.title };
+          set((s) => ({ events: [...s.events, ev] }));
+          get().pushToast(winText(1));
+        }
+        if (beatTimer) {
+          const bonus: WinEvent = { id: uid('w'), date, ts: now, source: 'bonus', refId: candidate.key, amount: 2, category: candidate.category, label: 'Momentum bonus' };
+          set((s) => ({ events: [...s.events, bonus] }));
+          get().pushToast('+2 Momentum Win ⚡', 'super');
+        }
+      },
+
+      setAISettings: (patch) => set((s) => ({ aiSettings: { ...s.aiSettings, ...patch } })),
+
+      resetDemoData: () => set((s) => ({ ...createSeedState(), aiSettings: s.aiSettings, toasts: [] })),
     }),
     {
       name: 'glowup-daily-v1',

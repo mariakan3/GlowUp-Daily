@@ -46,7 +46,9 @@ export function InsightsScreen() {
   const today = useToday();
   const events = useGlowStore((s) => s.events);
   const dayModes = useGlowStore((s) => s.dayModes);
-  const tasks = useGlowStore((s) => s.tasks);
+  const templates = useGlowStore((s) => s.tasks);
+  const dayPlan = useGlowStore((s) => s.dayPlan);
+  const tasks = useMemo(() => [...templates, ...(dayPlan?.tasks.filter((t) => !templates.some((x) => x.id === t.id)) ?? [])], [templates, dayPlan]);
   const focusSessions = useGlowStore((s) => s.focusSessions);
   const movementSessions = useGlowStore((s) => s.movementSessions);
   const goals = useGlowStore((s) => s.goals);
