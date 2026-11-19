@@ -1,4 +1,4 @@
-import { Minus, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowDown, ArrowUp, Minus, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { filterSuggestions, goalSuggestions, milestoneSuggestions } from '../data/suggestions';
@@ -54,6 +54,14 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
       const i = prev.findIndex((p) => !p.trim());
       if (i >= 0) return prev.map((p, j) => (j === i ? m : p));
       return prev.length < MAX_STEPS ? [...prev, m] : prev;
+    });
+  const moveStep = (index: number, direction: -1 | 1) =>
+    setSteps((prev) => {
+      const next = index + direction;
+      if (next < 0 || next >= prev.length) return prev;
+      const copy = [...prev];
+      [copy[index], copy[next]] = [copy[next], copy[index]];
+      return copy;
     });
   const canSave = title.trim().length > 0 && filled >= MIN_STEPS;
 
@@ -129,6 +137,16 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
             placeholderTextColor={colors.muted}
             style={[ui.input, { flex: 1 }]}
           />
+          {i > 0 ? (
+            <IconButton testID={`milestone-up-${i}`} label={`Move milestone ${i + 1} up`} onPress={() => moveStep(i, -1)}>
+              <ArrowUp size={15} color={colors.espresso} />
+            </IconButton>
+          ) : null}
+          {i < steps.length - 1 ? (
+            <IconButton testID={`milestone-down-${i}`} label={`Move milestone ${i + 1} down`} onPress={() => moveStep(i, 1)}>
+              <ArrowDown size={15} color={colors.espresso} />
+            </IconButton>
+          ) : null}
           {steps.length > MIN_STEPS ? (
             <IconButton label="Remove milestone" onPress={() => setSteps((prev) => prev.filter((_, j) => j !== i))}>
               <Minus size={15} color={colors.espresso} />
