@@ -1,10 +1,11 @@
-import { ArrowDown, ArrowUp, Minus, Plus, Trash2 } from 'lucide-react-native';
+import { Minus, Plus, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { filterSuggestions, goalSuggestions, milestoneSuggestions } from '../data/suggestions';
 import { useGlowStore } from '../store/useGlowStore';
 import { categoryMeta, categoryOrder, colors } from '../theme';
 import type { CategoryId, Goal } from '../types';
+import { ReorderRow } from './ReorderRow';
 import { Sheet } from './Sheet';
 import { SuggestionChips } from './SuggestionChips';
 import { Button, IconButton, Pill, ui } from './ui';
@@ -55,12 +56,13 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
       if (i >= 0) return prev.map((p, j) => (j === i ? m : p));
       return prev.length < MAX_STEPS ? [...prev, m] : prev;
     });
-  const moveStep = (index: number, direction: -1 | 1) =>
+  const reorderSteps = (from: number, to: number) =>
     setSteps((prev) => {
-      const next = index + direction;
-      if (next < 0 || next >= prev.length) return prev;
+      if (from === to || from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
       const copy = [...prev];
-      [copy[index], copy[next]] = [copy[next], copy[index]];
+      const [moved] = copy.splice(from, 1);
+      if (moved === undefined) return prev;
+      copy.splice(to, 0, moved);
       return copy;
     });
   const canSave = title.trim().length > 0 && filled >= MIN_STEPS;
@@ -127,7 +129,7 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
 
       <Text style={ui.label}>Milestones ({filled}/{MAX_STEPS})</Text>
       {steps.map((s, i) => (
-        <View key={i} style={styles.stepRow}>
+        <ReorderRow key={i} index={i} count={steps.length} onReorder={reorderSteps} testID={`milestone-drag-${i}`} label={`Reorder milestone ${i + 1}`} style={styles.stepRow}>
           <Text style={styles.stepNum}>{i + 1}</Text>
           <TextInput
             testID={`milestone-input-${i}`}
@@ -135,27 +137,17 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
             onChangeText={(v) => setSteps((prev) => prev.map((p, j) => (j === i ? v : p)))}
             placeholder={i === 0 ? 'First tiny step' : 'Next step'}
             placeholderTextColor={colors.muted}
-            style={[ui.input, { flex: 1 }]}
+            style={[ui.input, { flex: 1, minWidth: 0 }]}
           />
-          {i > 0 ? (
-            <IconButton testID={`milestone-up-${i}`} label={`Move milestone ${i + 1} up`} onPress={() => moveStep(i, -1)}>
-              <ArrowUp size={15} color={colors.espresso} />
-            </IconButton>
-          ) : null}
-          {i < steps.length - 1 ? (
-            <IconButton testID={`milestone-down-${i}`} label={`Move milestone ${i + 1} down`} onPress={() => moveStep(i, 1)}>
-              <ArrowDown size={15} color={colors.espresso} />
-            </IconButton>
-          ) : null}
           {steps.length > MIN_STEPS ? (
             <IconButton label="Remove milestone" onPress={() => setSteps((prev) => prev.filter((_, j) => j !== i))}>
               <Minus size={15} color={colors.espresso} />
             </IconButton>
           ) : null}
-        </View>
+        </ReorderRow>
       ))}
       <SuggestionChips testID="milestone-suggestions" title="Milestone ideas" items={milestoneIdeas.map((m) => ({ key: m, label: m }))} onPick={pickMilestone} />
-      {steps.length < MAX_STEPS ? <Button label="Add milestone" variant="soft" icon={<Plus size={16} color={colors.espresso} />} onPress={() => setSteps((p) => [...p, ''])} /> : null}
+      {steps.length < MAX_STEPS ? <Button testID="add-milestone" label="Add milestone" variant="soft" icon={<Plus size={16} color={colors.espresso} />} onPress={() => setSteps((p) => [...p, ''])} /> : null}
     </Sheet>
   );
 }

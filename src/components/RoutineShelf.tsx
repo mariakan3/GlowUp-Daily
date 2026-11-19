@@ -8,6 +8,7 @@ import { isDone } from '../lib/wins';
 import { useGlowStore } from '../store/useGlowStore';
 import { colors, radius, shadow } from '../theme';
 import type { RoutineId, RoutineStep } from '../types';
+import { ReorderRow } from './ReorderRow';
 import { SuggestionChips } from './SuggestionChips';
 import { IconButton, ProgressBar } from './ui';
 
@@ -16,7 +17,31 @@ const shelfMeta: Record<RoutineId, { title: string; emoji: string; color: string
   pm: { title: 'PM Shelf', emoji: '🌙', color: colors.lilac, tint: colors.lilacTint },
 };
 
-function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { step: RoutineStep; index: number; done: boolean; locked: boolean; isNext: boolean; editing: boolean; color: string; tint: string }) {
+function StepRow({
+  step,
+  index,
+  position,
+  total,
+  done,
+  locked,
+  isNext,
+  editing,
+  color,
+  tint,
+  onReorder,
+}: {
+  step: RoutineStep;
+  index: number;
+  position: number;
+  total: number;
+  done: boolean;
+  locked: boolean;
+  isNext: boolean;
+  editing: boolean;
+  color: string;
+  tint: string;
+  onReorder: (from: number, to: number) => void;
+}) {
   const toggle = useGlowStore((s) => s.toggleRoutineStep);
   const remove = useGlowStore((s) => s.removeRoutineStep);
   const update = useGlowStore((s) => s.updateRoutineStep);
@@ -60,7 +85,14 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
 
   if (editing) {
     return (
-      <View style={[styles.step, { backgroundColor: tint }]}>
+      <ReorderRow
+        index={position}
+        count={total}
+        onReorder={onReorder}
+        testID={`shelf-${step.routine}-drag-${step.id}`}
+        label={`Reorder ${step.title}`}
+        style={[styles.step, { backgroundColor: tint }]}
+      >
         <View style={[styles.stepNum, { backgroundColor: colors.cardSoft }]}>
           <Text style={styles.stepNumText}>{index}</Text>
         </View>
@@ -92,19 +124,26 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
         <IconButton label={`Remove ${step.title}`} onPress={() => remove(step.id)}>
           <Trash2 size={15} color={colors.danger} />
         </IconButton>
-      </View>
+      </ReorderRow>
     );
   }
 
   return (
     <Animated.View style={{ transform: [{ scale }, { translateX: shake }] }}>
-      <Pressable
+      <ReorderRow
+        index={position}
+        count={total}
+        onReorder={onReorder}
+        testID={`shelf-${step.routine}-drag-${step.id}`}
+        label={`Reorder ${step.title}`}
+        style={[styles.step, done && { backgroundColor: tint }, isNext && { borderColor: color, borderWidth: 2 }]}
+      >
+      <Pressable style={styles.stepMain}
         testID={`step-${step.id}`}
         accessibilityRole="checkbox"
         aria-checked={done}
         accessibilityLabel={`Step ${index}: ${step.title}`}
         onPress={onPress}
-        style={[styles.step, done && { backgroundColor: tint }, isNext && { borderColor: color, borderWidth: 2 }]}
       >
         <View style={[styles.stepNum, { backgroundColor: done ? color : colors.cardSoft }]}>
           {done ? <Check size={14} color={colors.espresso} strokeWidth={3} /> : <Text style={styles.stepNumText}>{index}</Text>}
@@ -116,6 +155,7 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
         </View>
         {locked && !done ? <Lock size={15} color={colors.muted} /> : null}
       </Pressable>
+      </ReorderRow>
     </Animated.View>
   );
 }
@@ -125,6 +165,7 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
   const allSteps = useGlowStore((s) => s.routineSteps);
   const events = useGlowStore((s) => s.events);
   const addRoutineStep = useGlowStore((s) => s.addRoutineStep);
+  const reorderRoutineSteps = useGlowStore((s) => s.reorderRoutineSteps);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const meta = shelfMeta[routine];
@@ -156,7 +197,7 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
           <Text style={styles.title}>{meta.title}</Text>
           <Text style={styles.sub}>
             {editing
-              ? 'Rename a step, change its emoji, or add one below'
+              ? 'Drag a step to reorder, or rename it and add one below'
               : steps.length === 0
                 ? 'Empty shelf. Add your steps in order'
                 : doneCount === steps.length
@@ -178,6 +219,9 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
           key={s.id}
           step={s}
           index={i + 1}
+          position={i}
+          total={steps.length}
+          onReorder={(from, to) => reorderRoutineSteps(routine, from, to)}
           done={done[i]}
           locked={nextIdx !== -1 && i > nextIdx}
           isNext={i === nextIdx}
@@ -222,7 +266,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 17, fontWeight: '800', color: colors.espresso },
   sub: { fontSize: 12, color: colors.muted, marginTop: 1 },
   edit: { fontSize: 14, fontWeight: '700', color: colors.matchaDeep },
-  step: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 10, borderRadius: radius.md, marginBottom: 6, backgroundColor: colors.oat, borderWidth: 2, borderColor: 'transparent' },
+  step: { gap: 8, paddingVertical: 8, paddingRight: 10, paddingLeft: 4, borderRadius: radius.md, marginBottom: 6, backgroundColor: colors.oat, borderWidth: 2, borderColor: 'transparent' },
+  stepMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   stepNum: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   stepNumText: { fontSize: 12, fontWeight: '800', color: colors.espressoSoft },
   stepEmoji: { fontSize: 18 },
@@ -232,5 +277,5 @@ const styles = StyleSheet.create({
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   addInput: { flex: 1, backgroundColor: colors.oat, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.espresso, borderWidth: 1, borderColor: colors.line },
   emojiInput: { width: 42, height: 40, borderRadius: radius.md, backgroundColor: colors.card, textAlign: 'center', fontSize: 18, color: colors.espresso, borderWidth: 1, borderColor: colors.line },
-  titleInput: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontWeight: '600', color: colors.espresso, borderWidth: 1, borderColor: colors.line },
+  titleInput: { flex: 1, minWidth: 0, backgroundColor: colors.card, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontWeight: '600', color: colors.espresso, borderWidth: 1, borderColor: colors.line },
 });

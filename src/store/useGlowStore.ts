@@ -17,6 +17,7 @@ import {
 } from '../lib/hard75';
 import { uid } from '../lib/id';
 import { activeTasksFor, doneTaskIds, shelfWinsFor } from '../lib/plan';
+import { reorderScope } from '../lib/reorder';
 import { getApiKey } from '../lib/secureKey';
 import { isDone, isTaskScheduled, modeOn } from '../lib/wins';
 import { DEFAULT_MODELS, planDay, splitIntoMicroWins, type QuickWinCandidate } from '../services/aiPlannerService';
@@ -91,6 +92,7 @@ export interface GlowState extends PersistedState {
   updateTask: (id: string, input: Partial<TaskInput>) => void;
   deleteTask: (id: string) => void;
   moveTask: (id: string, direction: -1 | 1, scopeIds: string[]) => void;
+  reorderTasks: (scopeIds: string[], from: number, to: number) => void;
   toggleTaskDay: (id: string, day: Weekday) => void;
 
   setEnergyMode: (mode: EnergyMode) => void;
@@ -98,6 +100,7 @@ export interface GlowState extends PersistedState {
   toggleRoutineStep: (stepId: string) => 'done' | 'undone' | 'locked';
   addRoutineStep: (routine: RoutineId, title: string, emoji: string) => void;
   updateRoutineStep: (stepId: string, patch: { title?: string; emoji?: string }) => void;
+  reorderRoutineSteps: (routine: RoutineId, from: number, to: number) => void;
   removeRoutineStep: (stepId: string) => void;
 
   setTimerPreset: (presetId: string) => void;
@@ -294,14 +297,19 @@ export const useGlowStore = create<GlowState>()(
         })),
 
       moveTask: (id, direction, scopeIds) => {
-        const { tasks } = get();
-        const scope = tasks.filter((t) => scopeIds.includes(t.id)).sort((a, b) => a.order - b.order);
-        const idx = scope.findIndex((t) => t.id === id);
-        const swapWith = scope[idx + direction];
-        if (idx < 0 || !swapWith) return;
-        const a = scope[idx];
+        const scope = get().tasks.filter((t) => scopeIds.includes(t.id)).sort((a, b) => a.order - b.order);
+        const from = scope.findIndex((t) => t.id === id);
+        get().reorderTasks(scopeIds, from, from + direction);
+      },
+
+      reorderTasks: (scopeIds, from, to) => {
+        const { tasks, dayPlan } = get();
+        const nextTasks = reorderScope(tasks, scopeIds, from, to);
+        const nextPlanTasks = dayPlan ? reorderScope(dayPlan.tasks, scopeIds, from, to) : null;
+        if (nextTasks === tasks && nextPlanTasks === (dayPlan?.tasks ?? null)) return;
         set({
-          tasks: tasks.map((t) => (t.id === a.id ? { ...t, order: swapWith.order } : t.id === swapWith.id ? { ...t, order: a.order } : t)),
+          tasks: nextTasks,
+          dayPlan: dayPlan && nextPlanTasks ? { ...dayPlan, tasks: nextPlanTasks } : dayPlan,
         });
       },
 
@@ -346,6 +354,13 @@ export const useGlowStore = create<GlowState>()(
             { id: uid('r'), routine, title, emoji, order: Math.max(-1, ...s.routineSteps.filter((r) => r.routine === routine).map((r) => r.order)) + 1 },
           ],
         })),
+
+      reorderRoutineSteps: (routine, from, to) => {
+        const steps = get().routineSteps;
+        const scopeIds = steps.filter((s) => s.routine === routine).sort((a, b) => a.order - b.order).map((s) => s.id);
+        const next = reorderScope(steps, scopeIds, from, to);
+        if (next !== steps) set({ routineSteps: next });
+      },
 
       updateRoutineStep: (stepId, patch) => {
         const current = get().routineSteps.find((r) => r.id === stepId);

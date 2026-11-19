@@ -10,6 +10,7 @@ import { GlowProgressRing } from '../components/GlowProgressRing';
 import { RoutineShelf } from '../components/RoutineShelf';
 import { SeventyFiveHardHomeCard } from '../components/SeventyFiveHardHomeCard';
 import { SuggestionChips } from '../components/SuggestionChips';
+import { ReorderRow } from '../components/ReorderRow';
 import { TaskCard } from '../components/TaskCard';
 import { filterSuggestions, taskSuggestions } from '../data/suggestions';
 import { Button, Card, Pill, Screen, SectionTitle } from '../components/ui';
@@ -55,6 +56,7 @@ export function HomeScreen() {
   const routineSteps = useGlowStore((s) => s.routineSteps);
   const userName = useGlowStore((s) => s.userName);
   const toggleTask = useGlowStore((s) => s.toggleTask);
+  const reorderTasks = useGlowStore((s) => s.reorderTasks);
   const addTask = useGlowStore((s) => s.addTask);
   const pushToast = useGlowStore((s) => s.pushToast);
   const dayPlan = useGlowStore((s) => s.dayPlan);
@@ -262,21 +264,24 @@ export function HomeScreen() {
               {!isCollapsed ? (
                 <View style={{ marginTop: 10 }}>
                   {includeShelf && shelf === 'am' ? <RoutineShelf routine="am" /> : null}
-                  {group.map((t) => (
-                    <TaskCard
-                      key={t.id}
-                      testID={`task-${t.id}`}
-                      title={t.title}
-                      emoji={t.emoji}
-                      category={t.category}
-                      done={isDone(events, today, 'task', t.id)}
-                      onToggle={() => toggleTask(t.id)}
-                      onLongPress={() => setModal({ open: true, task: t })}
-                      meta={t.remixNote ?? `${categoryMeta[t.category].emoji} ${categoryMeta[t.category].short}${t.tier === 1 ? ' · Essential' : ''}`}
-                      winLabel={`+${t.wins ?? 1}`}
-                      onSplit={t.splitFrom ? undefined : () => splitTask(t.id)}
-                      dimmed={!isTaskVisibleInMode(t, mode)}
-                    />
+                  {group.map((t, i) => (
+                    <ReorderRow key={t.id} index={i} count={group.length} onReorder={(from, to) => reorderTasks(group.map((task) => task.id), from, to)} testID={`task-${t.id}-drag`} label={`Reorder ${t.title}`}>
+                      <View style={{ flex: 1 }}>
+                        <TaskCard
+                          testID={`task-${t.id}`}
+                          title={t.title}
+                          emoji={t.emoji}
+                          category={t.category}
+                          done={isDone(events, today, 'task', t.id)}
+                          onToggle={() => toggleTask(t.id)}
+                          onLongPress={() => setModal({ open: true, task: t })}
+                          meta={t.remixNote ?? `${categoryMeta[t.category].emoji} ${categoryMeta[t.category].short}${t.tier === 1 ? ' · Essential' : ''}`}
+                          winLabel={`+${t.wins ?? 1}`}
+                          onSplit={t.splitFrom ? undefined : () => splitTask(t.id)}
+                          dimmed={!isTaskVisibleInMode(t, mode)}
+                        />
+                      </View>
+                    </ReorderRow>
                   ))}
                   {includeShelf && shelf === 'pm' ? <RoutineShelf routine="pm" /> : null}
                 </View>

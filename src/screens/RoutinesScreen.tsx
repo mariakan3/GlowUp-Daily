@@ -1,8 +1,9 @@
-import { ArrowDown, ArrowUp, Pencil, Plus } from 'lucide-react-native';
+import { Pencil, Plus } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { AddTaskModal } from '../components/AddTaskModal';
 import { RoutineShelf } from '../components/RoutineShelf';
+import { ReorderRow } from '../components/ReorderRow';
 import { Button, IconButton, Pill, SectionTitle } from '../components/ui';
 import { ALL_DAYS, daysLabel, weekdayShort } from '../lib/date';
 import { winFeedback } from '../lib/feedback';
@@ -14,7 +15,7 @@ const tierLabel = { 1: '🧸 Essential', 2: '🌿 Standard', 3: '🚀 High Era' 
 
 export function RoutinesScreen() {
   const tasks = useGlowStore((s) => s.tasks);
-  const moveTask = useGlowStore((s) => s.moveTask);
+  const reorderTasks = useGlowStore((s) => s.reorderTasks);
   const toggleTaskDay = useGlowStore((s) => s.toggleTaskDay);
   const [filter, setFilter] = useState<CategoryId | 'custom'>('custom');
   const [modal, setModal] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null });
@@ -56,7 +57,8 @@ export function RoutinesScreen() {
         </View>
       ) : (
         list.map((t, i) => (
-          <View key={t.id} style={styles.row} testID={`builder-${t.id}`}>
+          <ReorderRow key={t.id} index={i} count={list.length} onReorder={(from, to) => reorderTasks(scopeIds, from, to)} testID={`builder-drag-${t.id}`} label={`Reorder ${t.title}`} style={styles.row}>
+            <View style={{ flex: 1 }} testID={`builder-${t.id}`}>
             <View style={styles.rowTop}>
               <Text style={styles.emoji}>{t.emoji}</Text>
               <View style={{ flex: 1 }}>
@@ -65,17 +67,9 @@ export function RoutinesScreen() {
                   {timeOfDayMeta[t.timeOfDay].emoji} {t.timeOfDay === 'daytime' ? 'Daytime' : timeOfDayMeta[t.timeOfDay].label} · {tierLabel[t.tier]} · {daysLabel(t.days)}
                 </Text>
               </View>
-              <View style={styles.actions}>
-                <IconButton label={`Move ${t.title} up`} onPress={() => moveTask(t.id, -1, scopeIds)} style={i === 0 ? styles.disabled : undefined}>
-                  <ArrowUp size={15} color={colors.espresso} />
-                </IconButton>
-                <IconButton label={`Move ${t.title} down`} onPress={() => moveTask(t.id, 1, scopeIds)} style={i === list.length - 1 ? styles.disabled : undefined}>
-                  <ArrowDown size={15} color={colors.espresso} />
-                </IconButton>
-                <IconButton label={`Edit ${t.title}`} onPress={() => setModal({ open: true, task: t })}>
-                  <Pencil size={14} color={colors.espresso} />
-                </IconButton>
-              </View>
+              <IconButton label={`Edit ${t.title}`} onPress={() => setModal({ open: true, task: t })}>
+                <Pencil size={14} color={colors.espresso} />
+              </IconButton>
             </View>
             <View style={styles.days}>
               {ALL_DAYS.map((d) => {
@@ -97,7 +91,8 @@ export function RoutinesScreen() {
                 );
               })}
             </View>
-          </View>
+            </View>
+          </ReorderRow>
         ))
       )}
 
@@ -112,8 +107,6 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 22 },
   title: { fontSize: 14, fontWeight: '700', color: colors.espresso },
   meta: { fontSize: 11, color: colors.muted, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 6 },
-  disabled: { opacity: 0.35 },
   days: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
   day: { width: 34, height: 30, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 12, fontWeight: '700', color: colors.espressoSoft },
