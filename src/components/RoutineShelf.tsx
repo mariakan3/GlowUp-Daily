@@ -1,5 +1,5 @@
 import { Check, Lock, Plus, Trash2 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { filterSuggestions, shelfSuggestions } from '../data/suggestions';
 import { useToday } from '../lib/hooks';
@@ -19,9 +19,19 @@ const shelfMeta: Record<RoutineId, { title: string; emoji: string; color: string
 function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { step: RoutineStep; index: number; done: boolean; locked: boolean; isNext: boolean; editing: boolean; color: string; tint: string }) {
   const toggle = useGlowStore((s) => s.toggleRoutineStep);
   const remove = useGlowStore((s) => s.removeRoutineStep);
+  const update = useGlowStore((s) => s.updateRoutineStep);
   const pushToast = useGlowStore((s) => s.pushToast);
   const scale = useState(() => new Animated.Value(1))[0];
   const shake = useState(() => new Animated.Value(0))[0];
+  const [title, setTitle] = useState(step.title);
+  const [emoji, setEmoji] = useState(step.emoji);
+
+  useEffect(() => {
+    if (!editing) {
+      setTitle(step.title);
+      setEmoji(step.emoji);
+    }
+  }, [editing, step.title, step.emoji]);
 
   const onPress = () => {
     const result = toggle(step.id);
@@ -38,6 +48,53 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
       Animated.spring(scale, { toValue: 1, useNativeDriver, speed: 16 }),
     ]).start();
   };
+
+  const changeTitle = (value: string) => {
+    setTitle(value);
+    if (value.trim()) update(step.id, { title: value });
+  };
+  const changeEmoji = (value: string) => {
+    setEmoji(value);
+    if (value.trim()) update(step.id, { emoji: value });
+  };
+
+  if (editing) {
+    return (
+      <View style={[styles.step, { backgroundColor: tint }]}>
+        <View style={[styles.stepNum, { backgroundColor: colors.cardSoft }]}>
+          <Text style={styles.stepNumText}>{index}</Text>
+        </View>
+        <TextInput
+          testID={`shelf-${step.routine}-emoji-${step.id}`}
+          value={emoji}
+          onChangeText={changeEmoji}
+          onBlur={() => {
+            if (!emoji.trim()) setEmoji(step.emoji);
+          }}
+          selectTextOnFocus
+          maxLength={8}
+          accessibilityLabel={`Emoji for ${step.title}`}
+          style={styles.emojiInput}
+        />
+        <TextInput
+          testID={`shelf-${step.routine}-title-${step.id}`}
+          value={title}
+          onChangeText={changeTitle}
+          onBlur={() => {
+            if (!title.trim()) setTitle(step.title);
+          }}
+          placeholder="Step name"
+          placeholderTextColor={colors.muted}
+          maxLength={200}
+          accessibilityLabel={`Edit ${step.title}`}
+          style={styles.titleInput}
+        />
+        <IconButton label={`Remove ${step.title}`} onPress={() => remove(step.id)}>
+          <Trash2 size={15} color={colors.danger} />
+        </IconButton>
+      </View>
+    );
+  }
 
   return (
     <Animated.View style={{ transform: [{ scale }, { translateX: shake }] }}>
@@ -57,13 +114,7 @@ function StepRow({ step, index, done, locked, isNext, editing, color, tint }: { 
           <Text style={[styles.stepTitle, done && styles.stepTitleDone]}>{step.title}</Text>
           {isNext ? <Text style={styles.nextHint}>Up next · +1 win</Text> : null}
         </View>
-        {editing ? (
-          <IconButton label={`Remove ${step.title}`} onPress={() => remove(step.id)}>
-            <Trash2 size={15} color={colors.danger} />
-          </IconButton>
-        ) : locked && !done ? (
-          <Lock size={15} color={colors.muted} />
-        ) : null}
+        {locked && !done ? <Lock size={15} color={colors.muted} /> : null}
       </Pressable>
     </Animated.View>
   );
@@ -104,15 +155,17 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{meta.title}</Text>
           <Text style={styles.sub}>
-            {steps.length === 0
-              ? 'Empty shelf. Add your steps in order'
-              : doneCount === steps.length
-                ? 'Shelf complete, glowing ✨'
-                : `${doneCount}/${steps.length} steps · tap in order`}
+            {editing
+              ? 'Rename a step, change its emoji, or add one below'
+              : steps.length === 0
+                ? 'Empty shelf. Add your steps in order'
+                : doneCount === steps.length
+                  ? 'Shelf complete, glowing ✨'
+                  : `${doneCount}/${steps.length} steps · tap in order`}
           </Text>
         </View>
         {editable && steps.length > 0 ? (
-          <Pressable testID={`shelf-${routine}-edit`} onPress={() => setEditing((e) => !e)} hitSlop={8}>
+          <Pressable testID={`shelf-${routine}-edit`} accessibilityRole="button" accessibilityLabel={editing ? `Done editing ${meta.title}` : `Edit ${meta.title}`} onPress={() => setEditing((e) => !e)} hitSlop={8}>
             <Text style={styles.edit}>{editing ? 'Done' : 'Edit'}</Text>
           </Pressable>
         ) : null}
@@ -178,4 +231,6 @@ const styles = StyleSheet.create({
   nextHint: { fontSize: 11, color: colors.matchaDeep, fontWeight: '700', marginTop: 1 },
   addRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
   addInput: { flex: 1, backgroundColor: colors.oat, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: colors.espresso, borderWidth: 1, borderColor: colors.line },
+  emojiInput: { width: 42, height: 40, borderRadius: radius.md, backgroundColor: colors.card, textAlign: 'center', fontSize: 18, color: colors.espresso, borderWidth: 1, borderColor: colors.line },
+  titleInput: { flex: 1, backgroundColor: colors.card, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, fontWeight: '600', color: colors.espresso, borderWidth: 1, borderColor: colors.line },
 });

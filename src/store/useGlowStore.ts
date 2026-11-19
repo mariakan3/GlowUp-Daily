@@ -97,6 +97,7 @@ export interface GlowState extends PersistedState {
 
   toggleRoutineStep: (stepId: string) => 'done' | 'undone' | 'locked';
   addRoutineStep: (routine: RoutineId, title: string, emoji: string) => void;
+  updateRoutineStep: (stepId: string, patch: { title?: string; emoji?: string }) => void;
   removeRoutineStep: (stepId: string) => void;
 
   setTimerPreset: (presetId: string) => void;
@@ -345,6 +346,15 @@ export const useGlowStore = create<GlowState>()(
             { id: uid('r'), routine, title, emoji, order: Math.max(-1, ...s.routineSteps.filter((r) => r.routine === routine).map((r) => r.order)) + 1 },
           ],
         })),
+
+      updateRoutineStep: (stepId, patch) => {
+        const current = get().routineSteps.find((r) => r.id === stepId);
+        if (!current) return;
+        const title = patch.title === undefined ? current.title : patch.title.trim().slice(0, 200);
+        const emoji = patch.emoji === undefined ? current.emoji : patch.emoji.trim().slice(0, 16);
+        if (!title || !emoji || (title === current.title && emoji === current.emoji)) return;
+        set({ routineSteps: get().routineSteps.map((r) => (r.id === stepId ? { ...r, title, emoji } : r)) });
+      },
 
       removeRoutineStep: (stepId) =>
         set((s) => ({
