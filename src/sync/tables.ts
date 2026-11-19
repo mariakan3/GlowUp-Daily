@@ -1,6 +1,7 @@
+import { hasServerFields, mergeDevicePhotos } from '../lib/hard75';
 import { DEFAULT_MODELS } from '../services/aiPlannerService';
 import { createEmptyState, type PersistedState } from '../store/useGlowStore';
-import type { AIProvider, DayPlan, Goal, Milestone, Task, TimerState } from '../types';
+import type { AIProvider, DayPlan, Goal, Milestone, SeventyFiveHardDayLog, SeventyFiveHardMode, Task, TimerState } from '../types';
 
 export type Row = Record<string, unknown>;
 
@@ -85,6 +86,37 @@ export const tableSpecs: TableSpec[] = [
     table: 'day_plans',
     key: 'date',
     extract: (s) => (s.dayPlan ? [{ date: s.dayPlan.date, tasks: s.dayPlan.tasks }] : []),
+  },
+  {
+    table: 'hard75_settings',
+    key: null,
+    extract: (s) => [
+      {
+        active: s.seventyFiveHard.isActive,
+        start_date: s.seventyFiveHard.startDate,
+        mode: s.seventyFiveHard.mode,
+        photos_blurred: s.seventyFiveHard.photosBlurred,
+      },
+    ],
+  },
+  {
+    table: 'hard75_logs',
+    key: 'date',
+    extract: (s) =>
+      Object.entries(s.seventyFiveHard.dailyLogs)
+        .filter(([, log]) => hasServerFields(log))
+        .map(([date, log]) => ({
+          date,
+          rule1_diet: log.rule1Diet,
+          rule2_workout1: log.rule2Workout1,
+          rule2_workout2_outdoor: log.rule2Workout2Outdoor,
+          rule3_water: log.rule3WaterGallon,
+          water_oz: log.waterOzLogged,
+          rule4_read: log.rule4Read10Pages,
+          book_note: log.bookNote,
+          rule5_photo: log.rule5ProgressPic,
+          completed_at: log.completedAt ?? null,
+        })),
   },
 ];
 
@@ -193,5 +225,33 @@ export function rowsToState(rows: Record<string, Row[]>, local: PersistedState, 
       model: String(settings?.ai_model || (provider === 'off' ? DEFAULT_MODELS.openai : DEFAULT_MODELS[provider])),
       hasKey: local.aiSettings.hasKey,
     },
+    seventyFiveHard: hardFromRows(rows, local),
+  };
+}
+
+function hardFromRows(rows: Record<string, Row[]>, local: PersistedState): PersistedState['seventyFiveHard'] {
+  const settings = rows.hard75_settings?.[0];
+  const logs: Record<string, SeventyFiveHardDayLog> = {};
+  for (const row of rows.hard75_logs ?? []) {
+    const date = String(row.date).slice(0, 10);
+    logs[date] = {
+      rule1Diet: Boolean(row.rule1_diet),
+      rule2Workout1: Boolean(row.rule2_workout1),
+      rule2Workout2Outdoor: Boolean(row.rule2_workout2_outdoor),
+      rule3WaterGallon: Boolean(row.rule3_water),
+      waterOzLogged: Number(row.water_oz) || 0,
+      rule4Read10Pages: Boolean(row.rule4_read),
+      bookNote: String(row.book_note ?? ''),
+      rule5ProgressPic: Boolean(row.rule5_photo),
+      completedAt: row.completed_at ? String(row.completed_at) : undefined,
+    };
+  }
+  const mode: SeventyFiveHardMode = settings?.mode === 'soft' ? 'soft' : 'hardcore';
+  return {
+    isActive: settings ? Boolean(settings.active) : false,
+    startDate: settings?.start_date ? String(settings.start_date).slice(0, 10) : null,
+    mode,
+    photosBlurred: settings ? Boolean(settings.photos_blurred) : false,
+    dailyLogs: mergeDevicePhotos(logs, local.seventyFiveHard?.dailyLogs),
   };
 }

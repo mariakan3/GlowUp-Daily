@@ -8,6 +8,7 @@ import { DopamineRouletteModal } from '../components/DopamineRouletteModal';
 import { EnergyModeSelector } from '../components/EnergyModeSelector';
 import { GlowProgressRing } from '../components/GlowProgressRing';
 import { RoutineShelf } from '../components/RoutineShelf';
+import { SeventyFiveHardHomeCard } from '../components/SeventyFiveHardHomeCard';
 import { SuggestionChips } from '../components/SuggestionChips';
 import { TaskCard } from '../components/TaskCard';
 import { filterSuggestions, taskSuggestions } from '../data/suggestions';
@@ -99,6 +100,8 @@ export function HomeScreen() {
             <Text style={styles.streakText}>🔥 {streak} Day Streak</Text>
           </View>
         </View>
+
+        <SeventyFiveHardHomeCard />
 
         <View style={styles.heroRow}>
           <RemixHeroPill onPress={() => setConciergeOpen(true)} />

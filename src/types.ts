@@ -43,7 +43,7 @@ export interface RoutineStep {
   order: number;
 }
 
-export type WinSource = 'task' | 'routine' | 'focus' | 'movement' | 'milestone' | 'roulette' | 'bonus';
+export type WinSource = 'task' | 'routine' | 'focus' | 'movement' | 'milestone' | 'roulette' | 'bonus' | 'hard75';
 
 export interface WinEvent {
   id: string;
@@ -190,4 +190,31 @@ export interface AISettings {
   provider: AIProvider;
   model: string;
   hasKey: boolean;
+}
+
+export type SeventyFiveHardMode = 'hardcore' | 'soft';
+
+/** One challenge day. `photoUri` is a local file or blob URI and is never sent to the server. */
+export interface SeventyFiveHardDayLog {
+  rule1Diet: boolean;
+  rule2Workout1: boolean;
+  rule2Workout2Outdoor: boolean;
+  rule3WaterGallon: boolean;
+  /** Ounces toward 128 (one gallon). */
+  waterOzLogged: number;
+  rule4Read10Pages: boolean;
+  bookNote: string;
+  rule5ProgressPic: boolean;
+  photoUri?: string;
+  completedAt?: string;
+}
+
+export interface SeventyFiveHardState {
+  isActive: boolean;
+  /** YYYY-MM-DD the current attempt started. Day 1 is this date. */
+  startDate: string | null;
+  /** Hardcore is the official challenge. Soft keeps completed days when a day is missed. */
+  mode: SeventyFiveHardMode;
+  photosBlurred: boolean;
+  dailyLogs: Record<string, SeventyFiveHardDayLog>;
 }

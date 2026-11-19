@@ -3,6 +3,18 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { DEFAULT_FOCUS_SUBJECT, focusPresets } from '../data/presets';
 import { todayKey, weekdayOf } from '../lib/date';
+import { winFeedback } from '../lib/feedback';
+import {
+  HARD_RULES,
+  HARD_RULE_LABELS,
+  GALLON_OZ,
+  canEditHardDay,
+  challengeDayNumber,
+  emptyHardLog,
+  emptySeventyFive,
+  isHardLogEmpty,
+  ruleFlags,
+} from '../lib/hard75';
 import { uid } from '../lib/id';
 import { activeTasksFor, doneTaskIds, shelfWinsFor } from '../lib/plan';
 import { getApiKey } from '../lib/secureKey';
@@ -26,6 +38,9 @@ import type {
   RoutineStep,
   SportId,
   Task,
+  SeventyFiveHardDayLog,
+  SeventyFiveHardMode,
+  SeventyFiveHardState,
   TaskInput,
   TimerState,
   Toast,
@@ -61,6 +76,7 @@ export interface PersistedState {
   aiScheduleProfile: AIScheduleProfile | null;
   aiSettings: AISettings;
   onboarded: boolean;
+  seventyFiveHard: SeventyFiveHardState;
 }
 
 export interface GlowState extends PersistedState {
@@ -106,6 +122,17 @@ export interface GlowState extends PersistedState {
   completeQuickWin: (candidate: QuickWinCandidate, beatTimer: boolean) => void;
   setAISettings: (patch: Partial<AISettings>) => void;
 
+  startSeventyFiveHard: () => void;
+  pauseSeventyFiveHard: () => void;
+  restartSeventyFiveHard: () => void;
+  setSeventyFiveHardMode: (mode: SeventyFiveHardMode) => void;
+  setHardPhotosBlurred: (on: boolean) => void;
+  toggleHardRule: (rule: 1 | 2 | 3 | 4 | 5) => void;
+  toggleHardWorkout: (which: 1 | 2) => void;
+  addHardWater: (ounces: number) => void;
+  setHardBook: (note: string) => void;
+  setHardPhoto: (uri: string | null) => void;
+
   setUserName: (name: string) => void;
   completeOnboarding: (input: { name: string; tasks: TaskInput[]; steps: { routine: RoutineId; title: string; emoji: string }[] }) => void;
   /** Replaces all user data, e.g. after pulling from the server or signing out. */
@@ -129,6 +156,7 @@ export function createEmptyState(): PersistedState {
     aiScheduleProfile: null,
     aiSettings: { provider: 'off', model: DEFAULT_MODELS.openai, hasKey: false },
     onboarded: false,
+    seventyFiveHard: emptySeventyFive(),
   };
 }
 
@@ -149,6 +177,65 @@ export const userCacheKey = (userId: string) => `glowup-daily:user:${userId}`;
 
 const todayPlanOf = (s: Pick<PersistedState, 'tasks' | 'dayPlan'>, date: string) => activeTasksFor(s.tasks, s.dayPlan, date);
 const winText = (n: number) => `+${n} Win${n === 1 ? '' : 's'} ✨`;
+
+function todayHardLog(get: () => GlowState): SeventyFiveHardDayLog {
+  return { ...(get().seventyFiveHard.dailyLogs[todayKey()] ?? emptyHardLog()) };
+}
+
+function commitHardLog(get: () => GlowState, set: (partial: Partial<GlowState>) => void, next: SeventyFiveHardDayLog) {
+  const date = todayKey();
+  const state = get();
+  if (!canEditHardDay(state.seventyFiveHard, date)) return;
+  const prev = state.seventyFiveHard.dailyLogs[date] ?? emptyHardLog();
+  const prevFlags = ruleFlags(prev);
+  const nextFlags = ruleFlags(next);
+  const flagsChanged = HARD_RULES.some((rule) => prevFlags[rule] !== nextFlags[rule]);
+  const complete = HARD_RULES.every((rule) => nextFlags[rule]);
+  const wasComplete = HARD_RULES.every((rule) => prevFlags[rule]);
+  const log: SeventyFiveHardDayLog = complete
+    ? { ...next, completedAt: wasComplete && prev.completedAt ? prev.completedAt : new Date().toISOString() }
+    : { ...next, completedAt: undefined };
+  const dailyLogs = { ...state.seventyFiveHard.dailyLogs };
+  if (isHardLogEmpty(log)) delete dailyLogs[date];
+  else dailyLogs[date] = log;
+
+  let events = state.events;
+  if (flagsChanged) {
+    const dayNumber = challengeDayNumber(state.seventyFiveHard.startDate, date);
+    events = state.events.filter((e) => !(e.date === date && e.source === 'hard75'));
+    for (const rule of HARD_RULES) {
+      if (!nextFlags[rule]) continue;
+      events.push({ id: uid('w'), date, ts: Date.now(), source: 'hard75', refId: rule, amount: 1, category: 'selfcare', label: HARD_RULE_LABELS[rule] });
+    }
+    if (complete) {
+      events.push({
+        id: uid('w'),
+        date,
+        ts: Date.now(),
+        source: 'hard75',
+        refId: 'bonus',
+        amount: 3,
+        category: 'selfcare',
+        label: `75 Hard Day ${dayNumber} complete`,
+      });
+    }
+  }
+
+  set({ seventyFiveHard: { ...state.seventyFiveHard, dailyLogs }, events });
+  if (!flagsChanged) return;
+  const dayNumber = challengeDayNumber(state.seventyFiveHard.startDate, date);
+  const gained = HARD_RULES.filter((rule) => nextFlags[rule]).length > HARD_RULES.filter((rule) => prevFlags[rule]).length;
+  if (!wasComplete && complete) {
+    winFeedback('super');
+    get().pushToast(`75 Hard Day ${dayNumber} Complete! 🔥 (+3 Bonus Wins)`, 'super');
+  } else if (gained) {
+    winFeedback('win');
+    get().pushToast('+1 Win ✨');
+  } else {
+    winFeedback('undo');
+    get().pushToast(wasComplete ? 'Day reopened. Bonus wins reversed' : 'Win removed', 'info');
+  }
+}
 
 export function presetById(id: string) {
   return focusPresets.find((p) => p.id === id) ?? focusPresets[0];
@@ -473,6 +560,72 @@ export const useGlowStore = create<GlowState>()(
         }
       },
 
+      startSeventyFiveHard: () =>
+        set((s) => ({
+          seventyFiveHard: {
+            ...s.seventyFiveHard,
+            isActive: true,
+            startDate: s.seventyFiveHard.startDate ?? todayKey(),
+            mode: s.seventyFiveHard.mode,
+          },
+        })),
+
+      pauseSeventyFiveHard: () => set((s) => ({ seventyFiveHard: { ...s.seventyFiveHard, isActive: false } })),
+
+      restartSeventyFiveHard: () => {
+        const today = todayKey();
+        set((s) => ({
+          seventyFiveHard: { ...s.seventyFiveHard, isActive: true, startDate: today, dailyLogs: {} },
+          events: s.events.filter((e) => !(e.source === 'hard75' && e.date >= today)),
+        }));
+        get().pushToast('75 Hard is back to Day 1', 'info');
+      },
+
+      setSeventyFiveHardMode: (mode) => set((s) => ({ seventyFiveHard: { ...s.seventyFiveHard, mode } })),
+
+      setHardPhotosBlurred: (on) => set((s) => ({ seventyFiveHard: { ...s.seventyFiveHard, photosBlurred: on } })),
+
+      toggleHardRule: (rule) => {
+        const log = todayHardLog(get);
+        if (rule === 1) log.rule1Diet = !log.rule1Diet;
+        if (rule === 2) {
+          const on = !(log.rule2Workout1 && log.rule2Workout2Outdoor);
+          log.rule2Workout1 = on;
+          log.rule2Workout2Outdoor = on;
+        }
+        if (rule === 3) log.rule3WaterGallon = !log.rule3WaterGallon;
+        if (rule === 4) log.rule4Read10Pages = !log.rule4Read10Pages;
+        if (rule === 5) log.rule5ProgressPic = !log.rule5ProgressPic;
+        commitHardLog(get, set, log);
+      },
+
+      toggleHardWorkout: (which) => {
+        const log = todayHardLog(get);
+        if (which === 1) log.rule2Workout1 = !log.rule2Workout1;
+        else log.rule2Workout2Outdoor = !log.rule2Workout2Outdoor;
+        commitHardLog(get, set, log);
+      },
+
+      addHardWater: (ounces) => {
+        const log = todayHardLog(get);
+        log.waterOzLogged = Math.min(GALLON_OZ, log.waterOzLogged + Math.max(0, Math.round(ounces)));
+        if (log.waterOzLogged >= GALLON_OZ) log.rule3WaterGallon = true;
+        commitHardLog(get, set, log);
+      },
+
+      setHardBook: (note) => {
+        const log = todayHardLog(get);
+        log.bookNote = note;
+        commitHardLog(get, set, log);
+      },
+
+      setHardPhoto: (uri) => {
+        const log = todayHardLog(get);
+        log.photoUri = uri || undefined;
+        if (uri) log.rule5ProgressPic = true;
+        commitHardLog(get, set, log);
+      },
+
       setAISettings: (patch) => set((s) => ({ aiSettings: { ...s.aiSettings, ...patch } })),
 
       setUserName: (name) => set({ userName: name.trim() }),
@@ -493,7 +646,11 @@ export const useGlowStore = create<GlowState>()(
     }),
     {
       name: 'glowup-daily:signed-out',
-      version: 2,
+      version: 3,
+      migrate: (persisted) => {
+        const state = (persisted ?? {}) as Partial<PersistedState>;
+        return { ...createEmptyState(), ...state, seventyFiveHard: state.seventyFiveHard ?? emptySeventyFive() };
+      },
       skipHydration: true,
       storage: createJSONStorage(() => userCacheStorage),
       partialize: ({ hydrated, toasts, ...rest }) => {
