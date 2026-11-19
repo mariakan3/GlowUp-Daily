@@ -140,7 +140,7 @@ export function RoutineShelf({ routine, editable }: { routine: RoutineId; editab
     setDraft('');
   };
   const canAdd = editing || steps.length === 0;
-  const ideas = filterSuggestions(shelfSuggestions[routine], draft, steps.map((st) => st.title), (sg) => sg.title);
+  const ideas = filterSuggestions(shelfSuggestions[routine], draft, steps.map((st) => st.title), (sg) => sg.title, shelfSuggestions[routine].length);
   const addIdea = (title: string) => {
     const sg = shelfSuggestions[routine].find((x) => x.title === title);
     if (!sg) return;

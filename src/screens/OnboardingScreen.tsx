@@ -38,7 +38,10 @@ export function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initialName);
   const [picked, setPicked] = useState<string[]>([]);
-  const [steps, setSteps] = useState<{ routine: RoutineId; title: string }[]>([]);
+  const [steps, setSteps] = useState<{ routine: RoutineId; title: string }[]>([
+    { routine: 'am', title: 'Brush teeth' },
+    { routine: 'pm', title: 'Brush teeth' },
+  ]);
 
   const toggleTask = (title: string) => setPicked((p) => (p.includes(title) ? p.filter((x) => x !== title) : [...p, title]));
   const toggleStep = (routine: RoutineId, title: string) =>
@@ -103,7 +106,7 @@ export function OnboardingScreen() {
               <View key={r} style={{ marginTop: 14 }}>
                 <Text style={styles.cat}>{r === 'am' ? '🌤️ AM Shelf' : '🌙 PM Shelf'}</Text>
                 <View style={styles.wrap}>
-                  {shelfSuggestions[r].slice(0, 6).map((sg) => (
+                  {shelfSuggestions[r].slice(0, 7).map((sg) => (
                     <Choice key={sg.title} testID={`onboarding-${r}`} label={sg.title} emoji={sg.emoji} on={steps.some((x) => x.routine === r && x.title === sg.title)} onPress={() => toggleStep(r, sg.title)} />
                   ))}
                 </View>

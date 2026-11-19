@@ -79,8 +79,11 @@ export const taskSuggestions: TaskSuggestion[] = [
   t('home', '🗑️', 'Take out the trash', 'evening', 2, { minutes: 2 }),
 ];
 
+const brushTeeth = { title: 'Brush teeth', emoji: '🪥' };
+
 export const shelfSuggestions: Record<RoutineId, { title: string; emoji: string }[]> = {
   am: [
+    brushTeeth,
     { title: 'Gentle cleanse', emoji: '🫧' },
     { title: 'Toner & vitamin C serum', emoji: '💧' },
     { title: 'Hyaluronic acid serum', emoji: '💦' },
@@ -91,6 +94,7 @@ export const shelfSuggestions: Record<RoutineId, { title: string; emoji: string 
     { title: 'Ice roller', emoji: '🧊' },
   ],
   pm: [
+    brushTeeth,
     { title: 'Oil cleanse', emoji: '🫒' },
     { title: 'Second cleanse', emoji: '🫧' },
     { title: 'Exfoliating toner', emoji: '✨' },
