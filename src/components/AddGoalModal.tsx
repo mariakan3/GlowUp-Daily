@@ -62,7 +62,7 @@ function AddGoalForm({ visible, onClose, goal }: Props) {
     const input = { title, emoji, category, milestones: steps };
     if (goal) updateGoal(goal.id, input);
     else addGoal(input);
-    pushToast(goal ? 'Goal updated 🎯' : 'New big goal on the ladder 🪜', 'info');
+    pushToast(goal ? 'Goal updated 🎯' : 'A new goal is on your path ✨', 'info');
     onClose();
   };
 

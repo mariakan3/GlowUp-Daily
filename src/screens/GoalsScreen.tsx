@@ -101,11 +101,11 @@ export function GoalsScreen() {
         <Text style={styles.summaryNum}>
           {doneMs}/{totalMs}
         </Text>
-        <Text style={styles.summaryText}>milestones climbed · {doneMs * 3} Super Wins earned</Text>
+        <Text style={styles.summaryText}>milestones reached · {doneMs * 3} Super Wins earned</Text>
       </View>
       <SectionTitle
-        title="Milestones Ladder"
-        subtitle="Big dreams, tiny rungs"
+        title="Milestone Path"
+        subtitle="Big dreams, tiny steps"
         right={
           <IconButton testID="add-goal" label="Add goal" onPress={() => setModal({ open: true, goal: null })} style={{ backgroundColor: colors.espresso }}>
             <Plus size={18} color={colors.oat} />

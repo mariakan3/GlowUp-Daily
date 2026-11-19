@@ -96,7 +96,7 @@ export function InsightsScreen() {
     { emoji: '📚', title: 'Deep Worker', desc: '5h of focus in 7 days', unlocked: focusMin >= 300 },
     { emoji: '🎾', title: 'Movement Mix', desc: '3+ different sports this week', unlocked: sportsTried >= 3 },
     { emoji: '🧸', title: 'Soft Power', desc: 'Protected your streak on a Soft Day', unlocked: softSaves > 0 },
-    { emoji: '🌟', title: 'Super Winner', desc: 'Climbed a milestone this week', unlocked: msWeek > 0 },
+    { emoji: '🌟', title: 'Super Winner', desc: 'Reached a milestone this week', unlocked: msWeek > 0 },
     { emoji: '🏆', title: 'Goal Getter', desc: 'Finished every milestone of a goal', unlocked: goalsDone > 0 },
   ];
 
